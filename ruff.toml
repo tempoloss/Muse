@@ -1,0 +1,59 @@
+target-version = "py314"
+line-length = 100
+
+[lint]
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "B",
+    "UP",
+    "SIM",
+    "RUF",
+    "ERA",
+    "T20",
+    "PT",
+    "ASYNC",
+    "S",
+    "N",
+    "C4",
+    "RET",
+    "PIE",
+    "TID",
+    "C90",
+    "PLR0911",
+    "PLR0912",
+    "PLR0913",
+    "PLR0915",
+]
+ignore = ["E501", "S101", "RUF001", "RUF002", "RUF003"]
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pylint]
+max-args = 8
+max-returns = 6
+max-branches = 12
+max-statements = 50
+
+[lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[lint.flake8-tidy-imports.banned-api]
+"os.environ".msg = "read configuration in settings modules only"
+"os.getenv".msg = "read configuration in settings modules only"
+
+[lint.isort]
+known-first-party = ["muse", "muse_agent", "tests", "scripts"]
+
+[lint.per-file-ignores]
+"tests/**" = ["S", "PT011", "TID251"]
+"scripts/**" = ["T20", "S603", "S607"]
+"packages/server/muse/settings.py" = ["TID251"]
+"packages/agent/muse_agent/settings.py" = ["TID251"]
+"packages/agent/**" = ["S603", "S607"]
+
+[format]
+quote-style = "double"

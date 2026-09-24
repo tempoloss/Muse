@@ -20,3 +20,87 @@ filterwarnings = ["error::DeprecationWarning"]
 
 [tool.coverage.run]
 source = ["muse", "muse_agent"]
+
+[tool.ty.environment]
+root = ["packages/server", "packages/agent", "."]
+
+[tool.importlinter]
+root_packages = ["muse", "muse_agent"]
+
+[[tool.importlinter.contracts]]
+id = "c1"
+name = "the server does not import the agent"
+type = "forbidden"
+source_modules = ["muse"]
+forbidden_modules = ["muse_agent"]
+
+[[tool.importlinter.contracts]]
+id = "c2"
+name = "the agent does not import the server"
+type = "forbidden"
+source_modules = ["muse_agent"]
+forbidden_modules = ["muse"]
+
+[[tool.importlinter.contracts]]
+id = "c3"
+name = "context layers"
+type = "layers"
+containers = [
+    "muse.identity",
+    "muse.catalog",
+    "muse.artwork",
+    "muse.activity",
+    "muse.insights",
+    "muse.together",
+    "muse.notifications",
+    "muse.pet",
+    "muse.discovery",
+    "muse.daily",
+    "muse.home",
+    "muse.diagnostics",
+]
+layers = ["(routes)", "(schemas)", "(service) | (infra)", "(domain)"]
+
+[[tool.importlinter.contracts]]
+id = "c5"
+name = "the shared kernel imports no context and no composition root"
+type = "forbidden"
+source_modules = ["muse.shared"]
+forbidden_modules = [
+    "muse.identity",
+    "muse.catalog",
+    "muse.artwork",
+    "muse.activity",
+    "muse.insights",
+    "muse.together",
+    "muse.notifications",
+    "muse.pet",
+    "muse.discovery",
+    "muse.daily",
+    "muse.home",
+    "muse.diagnostics",
+    "muse.http",
+    "muse.wiring",
+    "muse.app",
+    "muse.cli",
+]
+
+[[tool.importlinter.contracts]]
+id = "c6"
+name = "contexts do not import the composition root"
+type = "forbidden"
+source_modules = [
+    "muse.identity",
+    "muse.catalog",
+    "muse.artwork",
+    "muse.activity",
+    "muse.insights",
+    "muse.together",
+    "muse.notifications",
+    "muse.pet",
+    "muse.discovery",
+    "muse.daily",
+    "muse.home",
+    "muse.diagnostics",
+]
+forbidden_modules = ["muse.http", "muse.wiring", "muse.app", "muse.cli"]
