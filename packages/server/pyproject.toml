@@ -1,0 +1,36 @@
+[project]
+name = "muse-server"
+version = "0.1.0"
+description = "Muse music server"
+requires-python = ">=3.14"
+license = "MIT"
+dependencies = [
+    "litestar[standard]>=2.24,<3",
+    "dishka>=1.10,<2",
+    "sqlalchemy[asyncio]>=2.0.54,<2.1",
+    "aiosqlite",
+    "alembic>=1.20",
+    "pydantic-settings>=2.15",
+    "msgspec>=0.21",
+    "structlog>=26.1",
+    "httpx>=0.28",
+    "redis>=6.4",
+    "uvicorn>=0.53",
+    "anyio>=4.15",
+    "bcrypt>=5",
+    "mutagen",
+    "pillow",
+    "pywebpush",
+    "py-vapid",
+]
+
+[project.scripts]
+muse = "muse.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.26,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "muse"
+module-root = ""

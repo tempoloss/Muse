@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+dist/
+*.sqlite
+*.sqlite-*
+*.db
+*.pem
+*.local.toml
