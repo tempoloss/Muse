@@ -1,0 +1,51 @@
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: detect-private-key
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: module-size
+        name: module size
+        entry: uv run python scripts/check_module_size.py
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: context-imports
+        name: context imports
+        entry: uv run python scripts/check_context_imports.py
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-push]
+      - id: lint-imports
+        name: import contracts
+        entry: uv run lint-imports
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-push]
+      - id: ty
+        name: ty
+        entry: uv run ty check
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-push]
