@@ -1,0 +1,55 @@
+from collections.abc import AsyncIterator
+from zoneinfo import ZoneInfo
+
+from dishka import Provider, Scope, provide
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from muse.settings import Settings
+from muse.shared.cache import Cache, NullCache, RedisCache
+from muse.shared.clock import Clock, ZonedClock
+from muse.shared.db import CatalogDb, UnitOfWork, catalog_engine, user_engine
+from muse.shared.tasks import BackgroundRunner
+
+
+class CoreProvider(Provider):
+    def __init__(self, settings: Settings) -> None:
+        super().__init__()
+        self._settings = settings
+
+    runner = provide(BackgroundRunner, scope=Scope.APP)
+
+    @provide(scope=Scope.APP)
+    def settings(self) -> Settings:
+        return self._settings
+
+    @provide(scope=Scope.APP)
+    def clock(self, settings: Settings) -> Clock:
+        return ZonedClock(ZoneInfo(settings.clock.timezone))
+
+    @provide(scope=Scope.APP)
+    async def catalog(self, settings: Settings) -> AsyncIterator[CatalogDb]:
+        engine = catalog_engine(settings.paths.catalog_db)
+        yield CatalogDb(engine)
+        await engine.dispose()
+
+    @provide(scope=Scope.APP)
+    async def sessions(self, settings: Settings) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+        engine = user_engine(settings.paths.user_db, settings.paths.catalog_db)
+        yield async_sessionmaker(engine, expire_on_commit=False)
+        await engine.dispose()
+
+    @provide(scope=Scope.APP)
+    async def cache(self, settings: Settings) -> AsyncIterator[Cache]:
+        if not settings.cache.redis_url:
+            yield NullCache()
+            return
+        cache = RedisCache(settings.cache.redis_url)
+        yield cache
+        await cache.close()
+
+    @provide(scope=Scope.REQUEST)
+    async def unit_of_work(
+        self, sessions: async_sessionmaker[AsyncSession]
+    ) -> AsyncIterator[UnitOfWork]:
+        async with sessions() as session:
+            yield UnitOfWork(session)
