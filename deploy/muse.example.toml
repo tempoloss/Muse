@@ -1,0 +1,21 @@
+[paths]
+data_dir = "/srv/muse/data"
+library_dir = "/srv/muse/lib"
+catalog_db = "/srv/muse/data/state.sqlite"
+web_dir = "/opt/muse/current/web"
+
+[http]
+host = "127.0.0.1"
+port = 4535
+public_host = "music.example.org"
+origins = ["https://music.example.org"]
+
+[push]
+enabled = true
+subject = "mailto:push@example.org"
+
+[cache]
+redis_url = "redis://127.0.0.1:6379/0"
+
+[clock]
+timezone = "UTC"

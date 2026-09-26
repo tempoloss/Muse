@@ -22,6 +22,7 @@ dependencies = [
     "pillow",
     "pywebpush",
     "py-vapid",
+    "tzdata; sys_platform == 'win32'",
 ]
 
 [project.scripts]
