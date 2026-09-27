@@ -1,14 +1,20 @@
 from collections.abc import AsyncIterator
 from zoneinfo import ZoneInfo
 
+import structlog
 from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from muse.identity.domain import AttemptLimiter, Users
+from muse.identity.infra.ratelimit import LoginRateLimiter
+from muse.identity.infra.users_file import UsersFile
 from muse.settings import Settings
 from muse.shared.cache import Cache, NullCache, RedisCache
 from muse.shared.clock import Clock, ZonedClock
 from muse.shared.db import CatalogDb, UnitOfWork, catalog_engine, user_engine
 from muse.shared.tasks import BackgroundRunner
+
+log = structlog.get_logger()
 
 
 class CoreProvider(Provider):
@@ -19,8 +25,20 @@ class CoreProvider(Provider):
     runner = provide(BackgroundRunner, scope=Scope.APP)
 
     @provide(scope=Scope.APP)
+    def limiter(self) -> AttemptLimiter:
+        return LoginRateLimiter()
+
+    @provide(scope=Scope.APP)
     def settings(self) -> Settings:
         return self._settings
+
+    @provide(scope=Scope.APP)
+    def users(self, settings: Settings) -> Users:
+        users = UsersFile(settings.paths.users_file).load()
+        for user in users.all:
+            if not user.password_hash:
+                log.warning(f"users: {user.id} has no password; run: muse passwd {user.id}")
+        return users
 
     @provide(scope=Scope.APP)
     def clock(self, settings: Settings) -> Clock:

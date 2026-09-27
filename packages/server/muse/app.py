@@ -8,14 +8,17 @@ from litestar import Litestar
 from muse.http.errors import EXCEPTION_HANDLERS
 from muse.http.policy import HttpPolicy
 from muse.http.spa import spa
+from muse.identity.domain import Users
 from muse.settings import Settings
 from muse.shared.tasks import BackgroundRunner
+from muse.wiring.contexts import ContextsProvider
 from muse.wiring.core import CoreProvider
 
 
 def lifespan(container: AsyncContainer) -> Callable[[Litestar], AbstractAsyncContextManager[None]]:
     @asynccontextmanager
     async def run(_: Litestar) -> AsyncIterator[None]:
+        await container.get(Users)
         runner = await container.get(BackgroundRunner)
         async with runner.running():
             yield
@@ -24,7 +27,9 @@ def lifespan(container: AsyncContainer) -> Callable[[Litestar], AbstractAsyncCon
 
 
 def create_app(settings: Settings, providers: Sequence[Provider] = ()) -> Litestar:
-    container = make_async_container(CoreProvider(settings), LitestarProvider(), *providers)
+    container = make_async_container(
+        CoreProvider(settings), ContextsProvider(), LitestarProvider(), *providers
+    )
     app = Litestar(
         route_handlers=[spa],
         exception_handlers=EXCEPTION_HANDLERS,

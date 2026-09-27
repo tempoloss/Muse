@@ -1,0 +1,30 @@
+{
+  "users": [
+    {
+      "id": "alex",
+      "login": "alex",
+      "name": "Алекс",
+      "name_gen": "Алекса",
+      "name_dat": "Алексу",
+      "animal": "fox",
+      "theme": "light",
+      "emoji": "🦊",
+      "nick": "Лисёнок",
+      "author": true,
+      "password_hash": null
+    },
+    {
+      "id": "sam",
+      "login": "sam",
+      "name": "Сэм",
+      "name_gen": "Сэма",
+      "name_dat": "Сэму",
+      "animal": "bear",
+      "theme": "dark",
+      "emoji": "🐻",
+      "nick": "Мишка",
+      "author": false,
+      "password_hash": null
+    }
+  ]
+}
