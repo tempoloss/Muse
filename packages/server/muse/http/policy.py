@@ -6,6 +6,8 @@ from urllib.parse import quote
 from litestar.types import ASGIApp, Message, Receive, Scope, Send
 from litestar.types.asgi_types import HTTPResponseBodyEvent, HTTPResponseStartEvent, HTTPScope
 
+from muse.identity.domain import SESSION_COOKIE, SESSION_TTL_S
+
 MUTATING = frozenset({"POST", "PUT", "DELETE", "PATCH"})
 CSP = (
     "default-src 'self'; img-src 'self' data: blob:; media-src 'self'; "
@@ -18,15 +20,12 @@ SECURITY_HEADERS = (
     (b"x-frame-options", b"DENY"),
 )
 RENEW_STATE_KEY = "muse_renew_sid"
-SESSION_COOKIE = "muse_sid"
-SESSION_MAX_AGE = 180 * 86400
 type Headers = list[tuple[bytes, bytes]]
 
 
 def renewal_cookie(token: str) -> bytes:
     return (
-        f"{SESSION_COOKIE}={token}; Max-Age={SESSION_MAX_AGE}; Path=/; Secure; HttpOnly; "
-        "SameSite=lax"
+        f"{SESSION_COOKIE}={token}; Max-Age={SESSION_TTL_S}; Path=/; Secure; HttpOnly; SameSite=lax"
     ).encode("latin-1")
 
 

@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from litestar.testing import AsyncTestClient
+import httpx
 
 from tests.server.support import WRITE
 
 
-async def test_client_routes_fall_back_to_the_shell_with_a_csp(client: AsyncTestClient) -> None:
+async def test_client_routes_fall_back_to_the_shell_with_a_csp(client: httpx.AsyncClient) -> None:
     response = await client.get("/library/whatever")
 
     assert (response.status_code, response.text) == (200, "<p>shell</p>")
@@ -17,7 +17,7 @@ async def test_client_routes_fall_back_to_the_shell_with_a_csp(client: AsyncTest
     assert response.headers["x-frame-options"] == "DENY"
 
 
-async def test_built_files_get_their_type_and_cache_policy(client: AsyncTestClient) -> None:
+async def test_built_files_get_their_type_and_cache_policy(client: httpx.AsyncClient) -> None:
     asset = await client.get("/assets/a.js")
     worker = await client.get("/sw.js")
     head = await client.head("/")
@@ -30,7 +30,7 @@ async def test_built_files_get_their_type_and_cache_policy(client: AsyncTestClie
 
 
 async def test_files_outside_the_web_directory_are_never_served(
-    client: AsyncTestClient, tmp_path: Path
+    client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
     (tmp_path / "secret.txt").write_text("secret", encoding="utf-8")
 
@@ -39,7 +39,7 @@ async def test_files_outside_the_web_directory_are_never_served(
     assert response.text == "<p>shell</p>"
 
 
-async def test_unknown_api_paths_are_json_404_without_a_session(client: AsyncTestClient) -> None:
+async def test_unknown_api_paths_are_json_404_without_a_session(client: httpx.AsyncClient) -> None:
     for path in ("/api/nope", "/api"):
         response = await client.get(path)
 
@@ -48,7 +48,7 @@ async def test_unknown_api_paths_are_json_404_without_a_session(client: AsyncTes
     assert (await client.get("/api/nope")).headers["cache-control"] == "no-store"
 
 
-async def test_a_missing_build_is_reported_as_503(client: AsyncTestClient, web_dir: Path) -> None:
+async def test_a_missing_build_is_reported_as_503(client: httpx.AsyncClient, web_dir: Path) -> None:
     (web_dir / "index.html").unlink()
 
     response = await client.get("/")
@@ -57,7 +57,7 @@ async def test_a_missing_build_is_reported_as_503(client: AsyncTestClient, web_d
     assert response.headers["content-type"].startswith("text/plain")
 
 
-async def test_state_changes_need_an_allowed_origin(client: AsyncTestClient) -> None:
+async def test_state_changes_need_an_allowed_origin(client: httpx.AsyncClient) -> None:
     missing = await client.post("/api/plays", json={})
     foreign = await client.post("/api/plays", json={}, headers={"Origin": "https://evil.example"})
     allowed = await client.post("/api/plays", json={}, headers=WRITE)
@@ -68,7 +68,7 @@ async def test_state_changes_need_an_allowed_origin(client: AsyncTestClient) -> 
     assert allowed.status_code == 405
 
 
-async def test_plain_http_visitors_are_sent_to_https(client: AsyncTestClient) -> None:
+async def test_plain_http_visitors_are_sent_to_https(client: httpx.AsyncClient) -> None:
     response = await client.get(
         "/library/x?tab=1", headers={"cf-visitor": '{"scheme": "http"}'}, follow_redirects=False
     )

@@ -1,11 +1,29 @@
 from datetime import datetime
+from typing import Any, cast
 from zoneinfo import ZoneInfo
+
+import httpx
+from litestar import Litestar
 
 from muse.shared.clock import ZonedClock
 
 ORIGIN = "https://testserver.local"
 WRITE = {"Origin": ORIGIN}
 PASSWORDS = {"alice": "test-pass-alice", "bob": "test-pass-bob"}
+
+
+def browser(app: Litestar, **headers: str) -> httpx.AsyncClient:
+    transport = httpx.ASGITransport(app=cast("Any", app))
+    return httpx.AsyncClient(transport=transport, base_url=ORIGIN, headers=headers)
+
+
+async def signed_in(app: Litestar, login: str) -> httpx.AsyncClient:
+    client = browser(app)
+    response = await client.post(
+        "/api/login", json={"login": login, "password": PASSWORDS[login]}, headers=WRITE
+    )
+    assert response.status_code == 200, response.text
+    return client
 
 
 class ManualClock(ZonedClock):

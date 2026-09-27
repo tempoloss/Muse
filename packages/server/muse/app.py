@@ -4,15 +4,20 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dishka import AsyncContainer, Provider, make_async_container
 from dishka.integrations.litestar import LitestarProvider, setup_dishka
 from litestar import Litestar
+from litestar.middleware import DefineMiddleware
 
+from muse.http.auth import SessionAuthMiddleware
 from muse.http.errors import EXCEPTION_HANDLERS
 from muse.http.policy import HttpPolicy
 from muse.http.spa import spa
 from muse.identity.domain import Users
+from muse.identity.routes import router as identity
 from muse.settings import Settings
 from muse.shared.tasks import BackgroundRunner
 from muse.wiring.contexts import ContextsProvider
 from muse.wiring.core import CoreProvider
+
+ROUTERS = (identity,)
 
 
 def lifespan(container: AsyncContainer) -> Callable[[Litestar], AbstractAsyncContextManager[None]]:
@@ -31,7 +36,8 @@ def create_app(settings: Settings, providers: Sequence[Provider] = ()) -> Litest
         CoreProvider(settings), ContextsProvider(), LitestarProvider(), *providers
     )
     app = Litestar(
-        route_handlers=[spa],
+        route_handlers=[*ROUTERS, spa],
+        middleware=[DefineMiddleware(SessionAuthMiddleware, exclude_from_auth_key="skip_auth")],
         exception_handlers=EXCEPTION_HANDLERS,
         openapi_config=None,
         lifespan=[lifespan(container)],

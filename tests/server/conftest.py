@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import bcrypt
+import httpx
 import pytest
+from litestar import Litestar
 from litestar.testing import AsyncTestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -14,7 +16,7 @@ from muse.app import create_app
 from muse.cli import upgrade_database
 from muse.settings import HttpSettings, PathsSettings, PushSettings, Settings
 from muse.shared.db import user_engine
-from tests.server.support import ORIGIN, PASSWORDS
+from tests.server.support import ORIGIN, PASSWORDS, browser, signed_in
 
 
 @pytest.fixture(scope="session")
@@ -105,6 +107,27 @@ async def sessions(settings: Settings) -> AsyncIterator[async_sessionmaker[Async
 
 
 @pytest.fixture
-async def client(settings: Settings) -> AsyncIterator[AsyncTestClient]:
-    async with AsyncTestClient(app=create_app(settings), base_url=ORIGIN) as client:
-        yield client
+async def app(settings: Settings) -> AsyncIterator[Litestar]:
+    application = create_app(settings)
+    async with AsyncTestClient(app=application, base_url=ORIGIN):
+        yield application
+
+
+@pytest.fixture
+async def client(app: Litestar) -> AsyncIterator[httpx.AsyncClient]:
+    async with browser(app) as anonymous:
+        yield anonymous
+
+
+@pytest.fixture
+async def alice(app: Litestar) -> AsyncIterator[httpx.AsyncClient]:
+    client = await signed_in(app, "alice")
+    yield client
+    await client.aclose()
+
+
+@pytest.fixture
+async def bob(app: Litestar) -> AsyncIterator[httpx.AsyncClient]:
+    client = await signed_in(app, "bob")
+    yield client
+    await client.aclose()

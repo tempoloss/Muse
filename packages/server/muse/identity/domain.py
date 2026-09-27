@@ -9,6 +9,7 @@ from muse.shared.errors import DomainError
 REQUIRED = ("id", "login", "name", "animal", "theme", "emoji", "nick")
 INCOMPLETE = f"users.json: every user needs non-empty string {', '.join(REQUIRED)}"
 DAY_S = 86400
+SESSION_COOKIE = "muse_sid"
 SESSION_TTL_S = 180 * DAY_S
 PASSWORD_MAX_BYTES = 72
 PASSWORD_MIN_CHARS = 10

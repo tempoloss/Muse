@@ -63,6 +63,13 @@ containers = [
 layers = ["(routes)", "(schemas)", "(service) | (infra)", "(domain)"]
 
 [[tool.importlinter.contracts]]
+id = "c4"
+name = "routes never import infrastructure"
+type = "forbidden"
+source_modules = ["muse.*.routes"]
+forbidden_modules = ["muse.*.infra"]
+
+[[tool.importlinter.contracts]]
 id = "c5"
 name = "the shared kernel imports no context and no composition root"
 type = "forbidden"
