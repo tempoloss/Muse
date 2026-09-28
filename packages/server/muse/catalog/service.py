@@ -1,4 +1,5 @@
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 import anyio
@@ -6,6 +7,7 @@ import anyio
 from muse.catalog.domain import (
     CATALOG_TTL_S,
     COVER_MOSAIC,
+    FILE_GONE,
     NO_ALBUM,
     NO_PLAYLIST,
     NO_SUCH_ARTIST,
@@ -17,6 +19,7 @@ from muse.catalog.domain import (
     LibraryState,
     PlaylistSource,
     Row,
+    TrackStorage,
     album_name,
     first_albums,
     playlist_tracks,
@@ -32,14 +35,28 @@ class Catalog:
         queries: CatalogQueries,
         library: LibraryState,
         playlists: PlaylistSource,
+        storage: TrackStorage,
         root: LibraryRoot,
         cache: Cache,
     ) -> None:
         self.queries = queries
         self.library = library
         self.playlist_source = playlists
+        self.storage = storage
         self.root = root
         self.cache = cache
+
+    async def stream_file(self, track_id: int) -> Path:
+        found = await self.queries.track_path(track_id)
+        if found is None:
+            raise DomainError(NO_TRACK)
+        path = await self.track_file(found["path"])
+        if path is None:
+            raise DomainError(FILE_GONE)
+        return path
+
+    async def track_file(self, stored: str | None) -> Path | None:
+        return await anyio.to_thread.run_sync(self.storage.locate, stored)
 
     async def fingerprint(self) -> str:
         return await anyio.to_thread.run_sync(self.library.fingerprint)

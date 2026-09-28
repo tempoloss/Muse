@@ -106,3 +106,6 @@ class SqlCatalog:
 
     async def playable_paths(self) -> list[Row]:
         return await self.db.rows(f"SELECT {TRACK_COLUMNS}, t.path {PLAYABLE}")
+
+    async def track_path(self, track_id: int) -> Row | None:
+        return await self.db.row("SELECT path FROM tracks WHERE id=? AND status='ok'", (track_id,))

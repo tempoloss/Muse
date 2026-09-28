@@ -8,6 +8,7 @@ import pytest
 from litestar import Litestar
 
 from muse.catalog.domain import LibraryRoot
+from muse.catalog.infra.files import TrackFiles
 from muse.catalog.infra.library import LibraryFiles
 from muse.catalog.infra.playlists import PlaylistFiles
 from muse.catalog.infra.sql import SqlCatalog
@@ -115,6 +116,7 @@ async def test_cached_listings_are_keyed_by_the_library_fingerprint(
         SqlCatalog(CatalogDb(catalog_engine(database))),
         LibraryFiles(database, playlists, tmp_path / "covers"),
         PlaylistFiles(playlists),
+        TrackFiles(library.library_dir, LibraryRoot.at(library.library_dir)),
         LibraryRoot.at(library.library_dir),
         cache,
     )

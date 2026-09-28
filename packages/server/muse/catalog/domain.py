@@ -1,7 +1,7 @@
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from typing import Any, Protocol
 
 type Row = dict[str, Any]
@@ -27,6 +27,7 @@ NO_ALBUM = "no album"
 NO_TRACK = "no track"
 NO_SUCH_GENRE = "no such genre"
 NO_PLAYLIST = "no playlist"
+FILE_GONE = "file gone"
 DEVICE_PREFIX = re.compile(r"^.*?/Music/")
 DRIVE = re.compile(r"^[A-Za-z]:/")
 
@@ -120,6 +121,8 @@ class CatalogQueries(Protocol):
 
     async def playable_paths(self) -> list[Row]: ...
 
+    async def track_path(self, track_id: int) -> Row | None: ...
+
 
 class LibraryState(Protocol):
     def fingerprint(self) -> str: ...
@@ -131,3 +134,7 @@ class PlaylistSource(Protocol):
     def names(self) -> list[str]: ...
 
     def lines(self, name: str) -> list[str] | None: ...
+
+
+class TrackStorage(Protocol):
+    def locate(self, stored: str | None) -> Path | None: ...

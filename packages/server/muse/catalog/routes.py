@@ -1,14 +1,31 @@
 from typing import Any
 
 from dishka.integrations.litestar import FromDishka, inject
-from litestar import Router, get
+from litestar import Request, Response, Router, get
 from litestar.params import FromPath, FromQuery
+from litestar.response import Stream
 
-from muse.catalog.domain import NO_ALBUM, NO_PLAYLIST, NO_SUCH_ARTIST, NO_SUCH_GENRE, NO_TRACK
+from muse.catalog.domain import (
+    FILE_GONE,
+    NO_ALBUM,
+    NO_PLAYLIST,
+    NO_SUCH_ARTIST,
+    NO_SUCH_GENRE,
+    NO_TRACK,
+)
 from muse.catalog.service import Catalog
 from muse.shared.errors import domain_errors
+from muse.shared.ranges import file_response
 
-ERRORS = {NO_SUCH_ARTIST: 404, NO_ALBUM: 404, NO_TRACK: 404, NO_SUCH_GENRE: 404, NO_PLAYLIST: 404}
+ERRORS = {
+    NO_SUCH_ARTIST: 404,
+    NO_ALBUM: 404,
+    NO_TRACK: 404,
+    NO_SUCH_GENRE: 404,
+    NO_PLAYLIST: 404,
+    FILE_GONE: 404,
+}
+MP3 = "audio/mpeg"
 
 
 @get("/genres")
@@ -71,6 +88,14 @@ async def playlist(name: FromPath[str], catalog: FromDishka[Catalog]) -> dict[st
     return await catalog.playlist(name)
 
 
+@get("/stream/{tid:int}")
+@inject
+async def stream(
+    tid: FromPath[int], request: Request, catalog: FromDishka[Catalog]
+) -> Response[bytes] | Stream:
+    return await file_response(await catalog.stream_file(tid), MP3, request)
+
+
 router = Router(
     "/api",
     route_handlers=[
@@ -81,6 +106,7 @@ router = Router(
         album,
         search,
         track,
+        stream,
         genre,
         playlists,
         playlist,
