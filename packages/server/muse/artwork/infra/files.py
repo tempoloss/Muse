@@ -67,8 +67,16 @@ class LocalShelf:
         path = self._image(key)
         return path if await anyio.Path(path).is_file() else None
 
+    async def load(self, key: str) -> bytes | None:
+        path = anyio.Path(self._image(key))
+        return await path.read_bytes() if await path.is_file() else None
+
     async def known_missing(self, key: str) -> bool:
         return await anyio.Path(self._miss(key)).is_file()
+
+    async def mark_missing(self, key: str) -> None:
+        await anyio.Path(self.directory).mkdir(parents=True, exist_ok=True)
+        await anyio.Path(self._miss(key)).touch()
 
     async def keep(self, key: str, data: bytes) -> Path:
         return await anyio.to_thread.run_sync(write_atomically, self._image(key), data)

@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from zoneinfo import ZoneInfo
 
+import httpx
 import structlog
 from dishka import Provider, Scope, provide
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -13,6 +14,9 @@ from muse.shared.cache import Cache, NullCache, RedisCache
 from muse.shared.clock import Clock, ZonedClock
 from muse.shared.db import CatalogDb, UnitOfWork, catalog_engine, user_engine
 from muse.shared.tasks import BackgroundRunner
+
+HTTP_TIMEOUT_S = 8
+USER_AGENT = "muse/1.0"
 
 log = structlog.get_logger()
 
@@ -71,3 +75,10 @@ class CoreProvider(Provider):
     ) -> AsyncIterator[UnitOfWork]:
         async with sessions() as session:
             yield UnitOfWork(session)
+
+    @provide(scope=Scope.APP)
+    async def http_client(self) -> AsyncIterator[httpx.AsyncClient]:
+        async with httpx.AsyncClient(
+            timeout=HTTP_TIMEOUT_S, headers={"User-Agent": USER_AGENT}
+        ) as client:
+            yield client

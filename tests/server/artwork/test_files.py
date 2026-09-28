@@ -38,8 +38,17 @@ async def test_a_kept_image_replaces_the_previous_one_without_leftovers(
 
     assert first == second == tmp_path / "covers" / "12.jpg"
     assert [path.name for path in (tmp_path / "covers").iterdir()] == ["12.jpg"]
-    assert (await files.covers.image("12"), second.read_bytes()) == (second, b"two")
-    assert await files.covers.image("13") is None
+    assert (await files.covers.image("12"), await files.covers.load("12")) == (second, b"two")
+    assert (await files.covers.image("13"), await files.covers.load("13")) == (None, None)
+
+
+async def test_a_known_miss_is_remembered_on_its_own_shelf(files: LocalArtworkFiles) -> None:
+    before = await files.covers.known_missing("12")
+    await files.covers.mark_missing("12")
+
+    assert (before, await files.covers.known_missing("12")) == (False, True)
+    assert await files.artists.known_missing("12") is False
+    assert await files.covers.image("12") is None
 
 
 @pytest.mark.parametrize("size", [128, 384])

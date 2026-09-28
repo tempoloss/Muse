@@ -35,7 +35,7 @@ def upgrade_database(user_db: Path) -> None:
 
 def serve(settings: Settings) -> None:
     uvicorn.run(
-        create_app(settings),
+        create_app(settings, jobs=True),
         host=settings.http.host,
         port=settings.http.port,
         log_level="warning",

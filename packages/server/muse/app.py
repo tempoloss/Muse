@@ -7,6 +7,7 @@ from litestar import Litestar
 from litestar.middleware import DefineMiddleware
 
 from muse.artwork.routes import router as artwork
+from muse.artwork.service import Artwork
 from muse.catalog.routes import router as catalog
 from muse.http.auth import SessionAuthMiddleware
 from muse.http.errors import EXCEPTION_HANDLERS
@@ -22,18 +23,24 @@ from muse.wiring.core import CoreProvider
 ROUTERS = (identity, catalog, artwork)
 
 
-def lifespan(container: AsyncContainer) -> Callable[[Litestar], AbstractAsyncContextManager[None]]:
+def lifespan(
+    container: AsyncContainer, *, jobs: bool
+) -> Callable[[Litestar], AbstractAsyncContextManager[None]]:
     @asynccontextmanager
     async def run(_: Litestar) -> AsyncIterator[None]:
         await container.get(Users)
         runner = await container.get(BackgroundRunner)
         async with runner.running():
+            if jobs:
+                runner.spawn((await container.get(Artwork)).warm, name="artwork")
             yield
 
     return run
 
 
-def create_app(settings: Settings, providers: Sequence[Provider] = ()) -> Litestar:
+def create_app(
+    settings: Settings, providers: Sequence[Provider] = (), *, jobs: bool = False
+) -> Litestar:
     container = make_async_container(
         CoreProvider(settings), ContextsProvider(), LitestarProvider(), *providers
     )
@@ -42,7 +49,7 @@ def create_app(settings: Settings, providers: Sequence[Provider] = ()) -> Litest
         middleware=[DefineMiddleware(SessionAuthMiddleware, exclude_from_auth_key="skip_auth")],
         exception_handlers=EXCEPTION_HANDLERS,
         openapi_config=None,
-        lifespan=[lifespan(container)],
+        lifespan=[lifespan(container, jobs=jobs)],
         on_shutdown=[container.close],
         logging_config=None,
     )

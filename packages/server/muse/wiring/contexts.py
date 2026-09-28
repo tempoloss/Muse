@@ -1,8 +1,11 @@
+import anyio
+import httpx
 from dishka import Provider, Scope, provide
 
-from muse.artwork.domain import ArtworkFiles, ArtworkLibrary
+from muse.artwork.domain import ArtworkFiles, ArtworkLibrary, ArtworkStores
 from muse.artwork.infra.files import LocalArtworkFiles
 from muse.artwork.infra.sql import SqlArtworkLibrary
+from muse.artwork.infra.stores import OnlineStores
 from muse.artwork.service import Artwork
 from muse.catalog.domain import (
     CatalogQueries,
@@ -50,9 +53,22 @@ class ContextsProvider(Provider):
         return TrackFiles(settings.paths.library_dir, root)
 
     artwork_library = provide(SqlArtworkLibrary, provides=ArtworkLibrary, scope=Scope.APP)
-    artwork = provide(Artwork, scope=Scope.APP)
 
     @provide(scope=Scope.APP)
     def artwork_files(self, settings: Settings) -> ArtworkFiles:
         paths = settings.paths
         return LocalArtworkFiles(paths.covers_dir, paths.artists_dir, paths.thumbs_dir)
+
+    @provide(scope=Scope.APP)
+    def artwork_stores(self, client: httpx.AsyncClient) -> ArtworkStores:
+        return OnlineStores(client, anyio.sleep)
+
+    @provide(scope=Scope.APP)
+    def artwork(
+        self,
+        catalog: Catalog,
+        library: ArtworkLibrary,
+        files: ArtworkFiles,
+        stores: ArtworkStores,
+    ) -> Artwork:
+        return Artwork(catalog, library, files, stores, anyio.sleep)
