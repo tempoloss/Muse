@@ -1,6 +1,5 @@
 import json
 import shutil
-import sqlite3
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
@@ -16,6 +15,7 @@ from muse.app import create_app
 from muse.cli import upgrade_database
 from muse.settings import HttpSettings, PathsSettings, PushSettings, Settings
 from muse.shared.db import user_engine
+from tests.fixtures.catalog import FixtureCatalog, build_catalog
 from tests.server.support import ORIGIN, PASSWORDS, browser, signed_in
 
 
@@ -71,18 +71,16 @@ def web_dir(tmp_path: Path) -> Path:
     return web
 
 
-@pytest.fixture
-def catalog_db(tmp_path: Path) -> Path:
-    path = tmp_path / "state.sqlite"
-    sqlite3.connect(path).close()
-    return path
+@pytest.fixture(scope="session")
+def library(tmp_path_factory: pytest.TempPathFactory) -> FixtureCatalog:
+    return build_catalog(tmp_path_factory.mktemp("catalog"))
 
 
 @pytest.fixture
 def settings(
     tmp_path: Path,
     web_dir: Path,
-    catalog_db: Path,
+    library: FixtureCatalog,
     user_db_template: Path,
     users_document: dict[str, Any],
 ) -> Settings:
@@ -92,7 +90,10 @@ def settings(
     (data / "users.json").write_text(json.dumps(users_document), encoding="utf-8")
     return Settings(
         paths=PathsSettings(
-            data_dir=data, library_dir=tmp_path / "lib", catalog_db=catalog_db, web_dir=web_dir
+            data_dir=data,
+            library_dir=library.library_dir,
+            catalog_db=library.catalog_db,
+            web_dir=web_dir,
         ),
         http=HttpSettings(public_host="music.example.org", origins=(ORIGIN,)),
         push=PushSettings(enabled=False),

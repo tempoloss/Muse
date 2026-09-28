@@ -56,6 +56,16 @@ async def web_file(web_dir: Path, relative: str) -> Path | None:
 
 
 @route(
+    ["/api", "/api/{path:path}"],
+    http_method=[HttpMethod.GET, HttpMethod.HEAD],
+    opt={"skip_auth": True},
+    include_in_schema=False,
+)
+async def api_not_found(path: FromPath[str] = "") -> Response[dict[str, object]]:
+    return detail_response(404, "not found")
+
+
+@route(
     ["/", "/{path:path}"],
     http_method=[HttpMethod.GET, HttpMethod.HEAD],
     opt={"skip_auth": True},
@@ -64,8 +74,6 @@ async def web_file(web_dir: Path, relative: str) -> Path | None:
 @inject
 async def spa(settings: FromDishka[Settings], path: FromPath[str] = "") -> Response | File:
     relative = path.lstrip("/")
-    if relative == "api" or relative.startswith("api/"):
-        return detail_response(404, "not found")
     web_dir = settings.paths.web_dir
     if found := await web_file(web_dir, relative):
         return served(found, cache_headers(relative))
