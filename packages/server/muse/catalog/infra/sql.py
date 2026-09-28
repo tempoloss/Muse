@@ -103,3 +103,6 @@ class SqlCatalog:
 
     async def library_tracks(self) -> list[Row]:
         return await self.db.rows(LIBRARY_TRACKS)
+
+    async def playable_paths(self) -> list[Row]:
+        return await self.db.rows(f"SELECT {TRACK_COLUMNS}, t.path {PLAYABLE}")

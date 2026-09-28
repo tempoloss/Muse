@@ -1,7 +1,8 @@
 from dishka import Provider, Scope, provide
 
-from muse.catalog.domain import CatalogQueries, LibraryState
+from muse.catalog.domain import CatalogQueries, LibraryRoot, LibraryState, PlaylistSource
 from muse.catalog.infra.library import LibraryFiles
+from muse.catalog.infra.playlists import PlaylistFiles
 from muse.catalog.infra.sql import SqlCatalog
 from muse.catalog.service import Catalog
 from muse.identity.domain import SessionStore
@@ -24,3 +25,11 @@ class ContextsProvider(Provider):
     def library(self, settings: Settings) -> LibraryState:
         paths = settings.paths
         return LibraryFiles(paths.catalog_db, paths.playlists_dir, paths.covers_dir)
+
+    @provide(scope=Scope.APP)
+    def playlists(self, settings: Settings) -> PlaylistSource:
+        return PlaylistFiles(settings.paths.playlists_dir)
+
+    @provide(scope=Scope.APP)
+    def library_root(self, settings: Settings) -> LibraryRoot:
+        return LibraryRoot.at(settings.paths.library_dir)

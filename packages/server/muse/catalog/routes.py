@@ -4,11 +4,11 @@ from dishka.integrations.litestar import FromDishka, inject
 from litestar import Router, get
 from litestar.params import FromPath, FromQuery
 
-from muse.catalog.domain import NO_ALBUM, NO_SUCH_ARTIST, NO_SUCH_GENRE, NO_TRACK
+from muse.catalog.domain import NO_ALBUM, NO_PLAYLIST, NO_SUCH_ARTIST, NO_SUCH_GENRE, NO_TRACK
 from muse.catalog.service import Catalog
 from muse.shared.errors import domain_errors
 
-ERRORS = {NO_SUCH_ARTIST: 404, NO_ALBUM: 404, NO_TRACK: 404, NO_SUCH_GENRE: 404}
+ERRORS = {NO_SUCH_ARTIST: 404, NO_ALBUM: 404, NO_TRACK: 404, NO_SUCH_GENRE: 404, NO_PLAYLIST: 404}
 
 
 @get("/genres")
@@ -59,8 +59,31 @@ async def genre(genre: FromPath[str], catalog: FromDishka[Catalog]) -> dict[str,
     return await catalog.genre(genre)
 
 
+@get("/playlists")
+@inject
+async def playlists(catalog: FromDishka[Catalog]) -> list[dict[str, Any]]:
+    return await catalog.playlists()
+
+
+@get("/playlist/{name:str}")
+@inject
+async def playlist(name: FromPath[str], catalog: FromDishka[Catalog]) -> dict[str, Any]:
+    return await catalog.playlist(name)
+
+
 router = Router(
     "/api",
-    route_handlers=[genres, artists, artist, albums, album, search, track, genre],
+    route_handlers=[
+        genres,
+        artists,
+        artist,
+        albums,
+        album,
+        search,
+        track,
+        genre,
+        playlists,
+        playlist,
+    ],
     exception_handlers=domain_errors(ERRORS),
 )

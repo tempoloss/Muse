@@ -7,15 +7,19 @@ from muse.catalog.domain import (
     CATALOG_TTL_S,
     COVER_MOSAIC,
     NO_ALBUM,
+    NO_PLAYLIST,
     NO_SUCH_ARTIST,
     NO_SUCH_GENRE,
     NO_TRACK,
     SEARCH_MIN_CHARS,
     CatalogQueries,
+    LibraryRoot,
     LibraryState,
+    PlaylistSource,
     Row,
     album_name,
     first_albums,
+    playlist_tracks,
     search_pattern,
 )
 from muse.shared.cache import Cache
@@ -23,9 +27,18 @@ from muse.shared.errors import DomainError
 
 
 class Catalog:
-    def __init__(self, queries: CatalogQueries, library: LibraryState, cache: Cache) -> None:
+    def __init__(
+        self,
+        queries: CatalogQueries,
+        library: LibraryState,
+        playlists: PlaylistSource,
+        root: LibraryRoot,
+        cache: Cache,
+    ) -> None:
         self.queries = queries
         self.library = library
+        self.playlist_source = playlists
+        self.root = root
         self.cache = cache
 
     async def fingerprint(self) -> str:
@@ -128,3 +141,56 @@ class Catalog:
 
     async def library_tracks(self) -> list[Row]:
         return await self.queries.library_tracks()
+
+    async def _playlist_index(self) -> dict[str, Row]:
+        by_key: dict[str, Row] = {}
+        for row in await self.queries.playable_paths():
+            if (key := self.root.key(row["path"])) is not None:
+                by_key[key] = row
+        return by_key
+
+    async def _playlist_tracks(self, name: str, by_key: dict[str, Row]) -> list[Row] | None:
+        lines = await anyio.to_thread.run_sync(self.playlist_source.lines, name)
+        return None if lines is None else playlist_tracks(lines, by_key)
+
+    async def _playlist_names(self) -> list[str]:
+        return await anyio.to_thread.run_sync(self.playlist_source.names)
+
+    async def has_playlist(self, name: str) -> bool:
+        return await anyio.to_thread.run_sync(self.playlist_source.lines, name) is not None
+
+    async def playlists(self) -> list[Row]:
+        async def compute() -> list[Row]:
+            by_key = await self._playlist_index()
+            out = []
+            for name in await self._playlist_names():
+                tracks = await self._playlist_tracks(name, by_key) or []
+                out.append(
+                    {
+                        "name": name,
+                        "tracks": len(tracks),
+                        "dur": sum(track["dur"] or 0 for track in tracks),
+                        "albums": await self.cover_ids(tracks),
+                    }
+                )
+            return out
+
+        return await self._cached("playlists", compute)
+
+    async def playlist(self, name: str) -> Row:
+        if not await self.has_playlist(name):
+            raise DomainError(NO_PLAYLIST)
+
+        async def compute() -> Row:
+            tracks = await self._playlist_tracks(name, await self._playlist_index()) or []
+            return {"name": name, "tracks": tracks, "albums": await self.cover_ids(tracks)}
+
+        return await self._cached(f"playlist:{name}", compute)
+
+    async def playlist_artists(self) -> list[set[str]]:
+        by_key = await self._playlist_index()
+        out = []
+        for name in await self._playlist_names():
+            tracks = await self._playlist_tracks(name, by_key) or []
+            out.append({track["artist"] for track in tracks})
+        return out
