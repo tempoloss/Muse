@@ -6,6 +6,7 @@ from dishka.integrations.litestar import LitestarProvider, setup_dishka
 from litestar import Litestar
 from litestar.middleware import DefineMiddleware
 
+from muse.artwork.routes import router as artwork
 from muse.catalog.routes import router as catalog
 from muse.http.auth import SessionAuthMiddleware
 from muse.http.errors import EXCEPTION_HANDLERS
@@ -18,7 +19,7 @@ from muse.shared.tasks import BackgroundRunner
 from muse.wiring.contexts import ContextsProvider
 from muse.wiring.core import CoreProvider
 
-ROUTERS = (identity, catalog)
+ROUTERS = (identity, catalog, artwork)
 
 
 def lifespan(container: AsyncContainer) -> Callable[[Litestar], AbstractAsyncContextManager[None]]:

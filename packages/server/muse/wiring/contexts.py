@@ -1,5 +1,9 @@
 from dishka import Provider, Scope, provide
 
+from muse.artwork.domain import ArtworkFiles, ArtworkLibrary
+from muse.artwork.infra.files import LocalArtworkFiles
+from muse.artwork.infra.sql import SqlArtworkLibrary
+from muse.artwork.service import Artwork
 from muse.catalog.domain import (
     CatalogQueries,
     LibraryRoot,
@@ -44,3 +48,11 @@ class ContextsProvider(Provider):
     @provide(scope=Scope.APP)
     def track_storage(self, settings: Settings, root: LibraryRoot) -> TrackStorage:
         return TrackFiles(settings.paths.library_dir, root)
+
+    artwork_library = provide(SqlArtworkLibrary, provides=ArtworkLibrary, scope=Scope.APP)
+    artwork = provide(Artwork, scope=Scope.APP)
+
+    @provide(scope=Scope.APP)
+    def artwork_files(self, settings: Settings) -> ArtworkFiles:
+        paths = settings.paths
+        return LocalArtworkFiles(paths.covers_dir, paths.artists_dir, paths.thumbs_dir)
