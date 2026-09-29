@@ -16,13 +16,14 @@ from muse.http.policy import HttpPolicy
 from muse.http.spa import api_not_found, spa
 from muse.identity.domain import Users
 from muse.identity.routes import router as identity
+from muse.notifications.routes import router as notifications
 from muse.settings import Settings
 from muse.shared.tasks import BackgroundRunner
 from muse.wiring.contexts import ContextsProvider
 from muse.wiring.core import CoreProvider
 from muse.wiring.events import EventsProvider
 
-ROUTERS = (identity, catalog, artwork, activity)
+ROUTERS = (identity, catalog, artwork, activity, notifications)
 
 
 def lifespan(

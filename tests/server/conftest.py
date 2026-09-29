@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from muse.app import create_app
 from muse.cli import upgrade_database
+from muse.notifications.domain import PushSender
+from muse.notifications.infra.sender import RecordingSender
 from muse.settings import HttpSettings, PathsSettings, PushSettings, Settings
 from muse.shared.db import user_engine
 from tests.fixtures.catalog import FixtureCatalog, build_catalog
@@ -132,3 +134,10 @@ async def bob(app: Litestar) -> AsyncIterator[httpx.AsyncClient]:
     client = await signed_in(app, "bob")
     yield client
     await client.aclose()
+
+
+@pytest.fixture
+async def pushes(app: Litestar) -> RecordingSender:
+    sender = await app.state.dishka_container.get(PushSender)
+    assert isinstance(sender, RecordingSender)
+    return sender

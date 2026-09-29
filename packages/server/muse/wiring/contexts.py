@@ -25,6 +25,9 @@ from muse.catalog.service import Catalog
 from muse.identity.domain import SessionStore
 from muse.identity.infra.sql import SqlSessions
 from muse.identity.service import LoginService, SessionService
+from muse.notifications.domain import SubscriptionRepository
+from muse.notifications.infra.sql import SqlSubscriptions
+from muse.notifications.service import Notifier, PushReactions, PushSubscriptions
 from muse.settings import Settings
 
 
@@ -80,3 +83,8 @@ class ContextsProvider(Provider):
     like_store = provide(SqlLikes, provides=LikeRepository)
     plays = provide(Plays)
     likes = provide(Likes)
+
+    subscription_store = provide(SqlSubscriptions, provides=SubscriptionRepository)
+    notifier = provide(Notifier)
+    push_subscriptions = provide(PushSubscriptions)
+    push_reactions = provide(PushReactions)

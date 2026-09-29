@@ -6,6 +6,7 @@ import httpx
 from dishka import Provider, Scope, provide
 from litestar import Litestar
 
+from muse.notifications.domain import PushMessage, PushSender
 from muse.shared.clock import Clock, ZonedClock
 
 ORIGIN = "https://testserver.local"
@@ -47,3 +48,25 @@ class ManualClockProvider(Provider):
     @provide(scope=Scope.APP)
     def clock(self) -> Clock:
         return self._clock
+
+
+class Inbox:
+    def __init__(self) -> None:
+        self.messages: list[tuple[str, PushMessage]] = []
+
+    @property
+    def public_key(self) -> str | None:
+        return None
+
+    async def send(self, user_id: str, message: PushMessage) -> None:
+        self.messages.append((user_id, message))
+
+
+class InboxProvider(Provider):
+    def __init__(self, inbox: Inbox) -> None:
+        super().__init__()
+        self.inbox = inbox
+
+    @provide(scope=Scope.APP)
+    def sender(self) -> PushSender:
+        return self.inbox

@@ -4,11 +4,15 @@ from zoneinfo import ZoneInfo
 import httpx
 import structlog
 from dishka import Provider, Scope, provide
+from pywebpush import webpush
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from muse.identity.domain import AttemptLimiter, Users
 from muse.identity.infra.ratelimit import LoginRateLimiter
 from muse.identity.infra.users_file import UsersFile
+from muse.notifications.domain import PushSender
+from muse.notifications.infra.sender import RecordingSender, WebPushSender
+from muse.notifications.infra.vapid import application_server_key
 from muse.settings import Settings
 from muse.shared.cache import Cache, NullCache, RedisCache
 from muse.shared.clock import Clock, ZonedClock
@@ -82,3 +86,22 @@ class CoreProvider(Provider):
             timeout=HTTP_TIMEOUT_S, headers={"User-Agent": USER_AGENT}
         ) as client:
             yield client
+
+    @provide(scope=Scope.APP)
+    def push_sender(
+        self,
+        settings: Settings,
+        sessions: async_sessionmaker[AsyncSession],
+        runner: BackgroundRunner,
+    ) -> PushSender:
+        if not settings.push.enabled:
+            return RecordingSender()
+        key_file = settings.paths.vapid_file
+        return WebPushSender(
+            public_key=application_server_key(key_file),
+            key_file=key_file,
+            subject=settings.push.subject,
+            sessions=sessions,
+            runner=runner,
+            webpush=webpush,
+        )
