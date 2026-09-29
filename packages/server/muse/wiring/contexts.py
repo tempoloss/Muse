@@ -2,6 +2,9 @@ import anyio
 import httpx
 from dishka import Provider, Scope, provide
 
+from muse.activity.domain import LikeRepository, PlayRepository
+from muse.activity.infra.sql import SqlLikes, SqlPlays
+from muse.activity.service import Likes, Plays
 from muse.artwork.domain import ArtworkFiles, ArtworkLibrary, ArtworkStores
 from muse.artwork.infra.files import LocalArtworkFiles
 from muse.artwork.infra.sql import SqlArtworkLibrary
@@ -72,3 +75,8 @@ class ContextsProvider(Provider):
         stores: ArtworkStores,
     ) -> Artwork:
         return Artwork(catalog, library, files, stores, anyio.sleep)
+
+    play_store = provide(SqlPlays, provides=PlayRepository)
+    like_store = provide(SqlLikes, provides=LikeRepository)
+    plays = provide(Plays)
+    likes = provide(Likes)

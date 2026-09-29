@@ -65,7 +65,7 @@ async def test_state_changes_need_an_allowed_origin(client: httpx.AsyncClient) -
     for response in (missing, foreign):
         assert (response.status_code, response.json()) == (403, {"detail": "bad origin"})
         assert response.headers["cache-control"] == "no-store"
-    assert allowed.status_code == 405
+    assert (allowed.status_code, allowed.json()) == (401, {"detail": "unauthorized"})
 
 
 async def test_plain_http_visitors_are_sent_to_https(client: httpx.AsyncClient) -> None:

@@ -6,6 +6,7 @@ from dishka.integrations.litestar import LitestarProvider, setup_dishka
 from litestar import Litestar
 from litestar.middleware import DefineMiddleware
 
+from muse.activity.routes import router as activity
 from muse.artwork.routes import router as artwork
 from muse.artwork.service import Artwork
 from muse.catalog.routes import router as catalog
@@ -19,8 +20,9 @@ from muse.settings import Settings
 from muse.shared.tasks import BackgroundRunner
 from muse.wiring.contexts import ContextsProvider
 from muse.wiring.core import CoreProvider
+from muse.wiring.events import EventsProvider
 
-ROUTERS = (identity, catalog, artwork)
+ROUTERS = (identity, catalog, artwork, activity)
 
 
 def lifespan(
@@ -42,7 +44,7 @@ def create_app(
     settings: Settings, providers: Sequence[Provider] = (), *, jobs: bool = False
 ) -> Litestar:
     container = make_async_container(
-        CoreProvider(settings), ContextsProvider(), LitestarProvider(), *providers
+        CoreProvider(settings), ContextsProvider(), EventsProvider(), LitestarProvider(), *providers
     )
     app = Litestar(
         route_handlers=[*ROUTERS, api_not_found, spa],

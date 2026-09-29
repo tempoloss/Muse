@@ -3,9 +3,10 @@ from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import httpx
+from dishka import Provider, Scope, provide
 from litestar import Litestar
 
-from muse.shared.clock import ZonedClock
+from muse.shared.clock import Clock, ZonedClock
 
 ORIGIN = "https://testserver.local"
 WRITE = {"Origin": ORIGIN}
@@ -36,3 +37,13 @@ class ManualClock(ZonedClock):
 
     def now(self) -> datetime:
         return datetime.fromtimestamp(self.ms / 1000, self.zone)
+
+
+class ManualClockProvider(Provider):
+    def __init__(self, clock: Clock) -> None:
+        super().__init__()
+        self._clock = clock
+
+    @provide(scope=Scope.APP)
+    def clock(self) -> Clock:
+        return self._clock
