@@ -1,12 +1,16 @@
 from datetime import date
 
 from muse.activity.domain import LikeChanged, PlayRecorded
+from muse.catalog.domain import NO_ALBUM
 from muse.catalog.service import Catalog
 from muse.identity.domain import Users
+from muse.notifications.service import Notifier
 from muse.pet.domain import (
     BAD_NAME,
     CARE,
     CARE_BONUS,
+    DONE,
+    HUNGER_PUSH_EVERY_MS,
     MUSIC_FOOD,
     NO_SUCH_ACTION,
     PET_MUSIC_DAY,
@@ -18,6 +22,7 @@ from muse.pet.domain import (
     ListeningTogether,
     Pet,
     PetRepository,
+    QuestAlbumChosen,
     QuestPick,
     QuestProgress,
     QuestRepository,
@@ -27,6 +32,7 @@ from muse.pet.domain import (
     any_album,
     cared,
     drawn_album,
+    hungry,
     pet_view,
     quest_kind,
     quest_view,
@@ -39,6 +45,7 @@ from muse.pet.domain import (
 from muse.shared.clock import Clock
 from muse.shared.db import UnitOfWork
 from muse.shared.errors import DomainError
+from muse.shared.events import EventBus
 
 
 class PetKeeper:
@@ -71,6 +78,16 @@ class Quests:
         picked = await self.quests.picked(today.isoformat())
         kind = picked.kind if picked else quest_kind(today)
         return quest_view(kind, await self._progress(kind, picked, user_id, today), picked)
+
+    async def playable_album(self, album_id: int) -> Row:
+        found = next((a for a in await self.catalog.albums() if a["id"] == album_id), None)
+        if found is None:
+            raise DomainError(NO_ALBUM)
+        return found
+
+    async def choose_album(self, user_id: str, album_id: int, now: int) -> None:
+        chosen = QuestPick("same_album", album_id, user_id)
+        await self.quests.pick(self.clock.today().isoformat(), chosen, now)
 
     async def _progress(
         self, kind: str, picked: QuestPick | None, user_id: str, today: date
@@ -208,3 +225,88 @@ class PetReactions:
         now = self.clock.now_ms()
         await self.keeper.add(now, **TREAT)
         await self.pets.log(now, event.user, "treat", str(event.track_id))
+
+
+class QuestAlbums:
+    def __init__(
+        self,
+        quests: Quests,
+        pets: PetRepository,
+        views: PetViews,
+        bus: EventBus,
+        clock: Clock,
+        uow: UnitOfWork,
+    ) -> None:
+        self.quests = quests
+        self.pets = pets
+        self.views = views
+        self.bus = bus
+        self.clock = clock
+        self.uow = uow
+
+    async def choose(self, user_id: str, album_id: int) -> Row:
+        album = await self.quests.playable_album(album_id)
+        now = self.clock.now_ms()
+        await self.pets.lock()
+        if (await self.quests.today(user_id))["done"]:
+            raise DomainError(DONE)
+        await self.quests.choose_album(user_id, album["id"], now)
+        chosen = QuestAlbumChosen(user_id, album["id"], album["name"], album["artist"])
+        await self.bus.publish(chosen)
+        view = await self.views.view(user_id, now)
+        await self.uow.commit()
+        return view
+
+
+class PetPushes:
+    def __init__(self, notifier: Notifier, users: Users, clock: Clock) -> None:
+        self.notifier = notifier
+        self.users = users
+        self.clock = clock
+
+    async def quest_album(self, event: QuestAlbumChosen) -> None:
+        chooser = self.users.get(event.user)
+        if chooser is None:
+            return
+        await self.notifier.notify(
+            self.users.partner_id(event.user),
+            f"{chooser.beast} выбрал альбом дня",
+            f"Слушаем вместе\n🎵 {event.name} · {event.artist}",
+            "/us",
+            f"quest-{self.clock.today().isoformat()}",
+        )
+
+    async def hungry(self) -> None:
+        first, second = self.users.all
+        for user in self.users.all:
+            await self.notifier.notify(
+                user.id,
+                f"{first.emoji}{second.emoji} {first.nick} и {second.nick} проголодались",
+                "Покорми их во вкладке «Мы» или просто включи музыку",
+                "/us",
+                "pet-hungry",
+            )
+
+
+class HungerWatch:
+    def __init__(
+        self,
+        keeper: PetKeeper,
+        pets: PetRepository,
+        pushes: PetPushes,
+        clock: Clock,
+        uow: UnitOfWork,
+    ) -> None:
+        self.keeper = keeper
+        self.pets = pets
+        self.pushes = pushes
+        self.clock = clock
+        self.uow = uow
+
+    async def check(self) -> None:
+        now = self.clock.now_ms()
+        pet = await self.keeper.tick(now)
+        if hungry(pet) and not await self.pets.hungry_pushed_since(now - HUNGER_PUSH_EVERY_MS):
+            await self.pets.log(now, None, "hungry_push")
+            await self.pushes.hungry()
+        await self.uow.commit()

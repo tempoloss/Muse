@@ -7,7 +7,7 @@ from litestar.testing import AsyncTestClient
 from muse.app import create_app
 from muse.settings import Settings
 from tests.server.pet.support import LETTERS_DAY, PetTable, noon_ms
-from tests.server.support import ORIGIN, ManualClock, ManualClockProvider
+from tests.server.support import ORIGIN, Inbox, InboxProvider, ManualClock, ManualClockProvider
 
 
 @pytest.fixture
@@ -16,8 +16,13 @@ def clock() -> ManualClock:
 
 
 @pytest.fixture
-async def app(settings: Settings, clock: ManualClock) -> AsyncIterator[Litestar]:
-    application = create_app(settings, providers=[ManualClockProvider(clock)])
+def inbox() -> Inbox:
+    return Inbox()
+
+
+@pytest.fixture
+async def app(settings: Settings, clock: ManualClock, inbox: Inbox) -> AsyncIterator[Litestar]:
+    application = create_app(settings, providers=[ManualClockProvider(clock), InboxProvider(inbox)])
     async with AsyncTestClient(app=application, base_url=ORIGIN):
         yield application
 

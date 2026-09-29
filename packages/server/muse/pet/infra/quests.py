@@ -3,6 +3,7 @@ from muse.pet.domain import QuestPick
 from muse.shared.db import UnitOfWork
 
 PICKED = "SELECT kind, album_id, set_by FROM quest_day WHERE day=?"
+PICK = "INSERT OR REPLACE INTO quest_day VALUES (?,?,?,?,?)"
 ALBUM_HEARD = (
     f"SELECT p.user, COUNT(DISTINCT p.track_id) heard {PLAYS_LIB}WHERE p.started_at>=? "
     f"AND lib_t.album_id=? AND {COUNTED} GROUP BY p.user"
@@ -26,6 +27,9 @@ class SqlQuests:
     async def picked(self, day: str) -> QuestPick | None:
         row = await self.uow.row(PICKED, (day,))
         return QuestPick(row["kind"], row["album_id"], row["set_by"]) if row else None
+
+    async def pick(self, day: str, chosen: QuestPick, at: int) -> None:
+        await self.uow.execute(PICK, (day, chosen.kind, chosen.album_id, chosen.set_by, at))
 
     async def album_heard(self, since: int, album_id: int) -> dict[str, int]:
         rows = await self.uow.rows(ALBUM_HEARD, (since, album_id))

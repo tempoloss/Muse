@@ -25,6 +25,7 @@ RECENT = (
     "SELECT at, user, action FROM pet_log WHERE action NOT IN ('music', 'hungry_push') "
     "ORDER BY at DESC, id DESC LIMIT 8"
 )
+HUNGRY_PUSHED = "SELECT 1 FROM pet_log WHERE action='hungry_push' AND at>=?"
 
 
 class PetRowMissingError(LookupError):
@@ -88,3 +89,6 @@ class SqlPets:
 
     async def recent_log(self) -> list[Row]:
         return await self.uow.rows(RECENT)
+
+    async def hungry_pushed_since(self, since: int) -> bool:
+        return await self.uow.row(HUNGRY_PUSHED, (since,)) is not None

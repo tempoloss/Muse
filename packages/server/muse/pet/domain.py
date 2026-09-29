@@ -6,6 +6,7 @@ from datetime import date
 from typing import Any, Protocol
 
 from muse.shared.errors import DomainError
+from muse.shared.events import Event
 
 type Row = dict[str, Any]
 
@@ -26,12 +27,15 @@ CARE_BONUS = {"food": 10, "joy": 20, "energy": 10, "clean": 10}
 QUEST_REWARD = {"food": 20, "joy": 20, "energy": 20, "clean": 20}
 NAME_MAX_CHARS = 24
 HUNGRY_BELOW = 25
+HUNGER_CHECK_S = 600
+HUNGER_PUSH_EVERY_MS = 12 * HOUR_MS
 DIRTY_BELOW = 30
 NO_SUCH_ACTION = "no such action"
 BAD_NAME = "bad name"
 ASLEEP = "asleep"
 TIRED = "tired"
 HEALTHY = "healthy"
+DONE = "done"
 QUESTS = {
     "same_album": ("Послушаем альбом «{album}» — {artist}", 2),
     "shared_like": ("Найдём песню, которая понравится нам обоим", 1),
@@ -97,6 +101,10 @@ def added(pet: Pet, **deltas: float) -> Pet:
     )
 
 
+def hungry(pet: Pet) -> bool:
+    return pet.food < HUNGRY_BELOW
+
+
 def mood(pet: Pet, together: bool) -> str:
     if pet.sick:
         return "sick"
@@ -104,7 +112,7 @@ def mood(pet: Pet, together: bool) -> str:
         return "sleeping"
     if together:
         return "dancing"
-    if pet.food < HUNGRY_BELOW:
+    if hungry(pet):
         return "hungry"
     if pet.clean < DIRTY_BELOW:
         return "dirty"
@@ -254,6 +262,14 @@ def quest_view(kind: str, progress: QuestProgress, picked: QuestPick | None) -> 
     }
 
 
+@dataclass(frozen=True, slots=True)
+class QuestAlbumChosen(Event):
+    user: str
+    album_id: int
+    name: str
+    artist: str
+
+
 class ListeningTogether(Protocol):
     def together_now(self, now_ms: int) -> bool: ...
 
@@ -281,9 +297,13 @@ class PetRepository(Protocol):
 
     async def recent_log(self) -> list[Row]: ...
 
+    async def hungry_pushed_since(self, since: int) -> bool: ...
+
 
 class QuestRepository(Protocol):
     async def picked(self, day: str) -> QuestPick | None: ...
+
+    async def pick(self, day: str, chosen: QuestPick, at: int) -> None: ...
 
     async def album_heard(self, since: int, album_id: int) -> dict[str, int]: ...
 

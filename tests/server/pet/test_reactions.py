@@ -1,12 +1,9 @@
-from typing import Any
-
 import httpx
 import pytest
 
-from muse.notifications.infra.sender import RecordingSender
 from muse.settings import Settings
-from tests.server.pet.support import DAY_MS, PetTable, catalog_ids
-from tests.server.support import WRITE, ManualClock
+from tests.server.pet.support import DAY_MS, PetTable, catalog_ids, play
+from tests.server.support import WRITE, Inbox, ManualClock
 
 
 @pytest.fixture
@@ -16,22 +13,11 @@ def tracks(settings: Settings) -> list[int]:
     )
 
 
-def play(track_id: int, listened_ms: int, started_at: int) -> dict[str, Any]:
-    return {
-        "track_id": track_id,
-        "started_at": started_at,
-        "listened_ms": listened_ms,
-        "completed": False,
-        "skipped": False,
-        "source": "other",
-    }
-
-
 async def test_music_feeds_once_per_play_and_a_mutual_like_is_a_treat(
     alice: httpx.AsyncClient,
     bob: httpx.AsyncClient,
     pet_table: PetTable,
-    pushes: RecordingSender,
+    inbox: Inbox,
     clock: ManualClock,
     tracks: list[int],
 ) -> None:
@@ -48,7 +34,7 @@ async def test_music_feeds_once_per_play_and_a_mutual_like_is_a_treat(
     assert (pet_table.row()["food"], pet_table.row()["joy"]) == (62, 60)
     assert pet_table.log("music") == [("bob", "2")]
     assert pet_table.log("treat") == [("bob", str(liked))]
-    assert [push[0] for push in pushes.sent if "Совпало!" in push[1]] == ["alice"]
+    assert [user for user, message in inbox.messages if "Совпало!" in message.title] == ["alice"]
 
 
 async def test_music_feeds_at_most_30_food_a_day(

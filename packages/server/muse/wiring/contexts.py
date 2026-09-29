@@ -31,7 +31,16 @@ from muse.notifications.service import Notifier, PushReactions, PushSubscription
 from muse.pet.domain import PetRepository, QuestRepository
 from muse.pet.infra.quests import SqlQuests
 from muse.pet.infra.sql import SqlPets
-from muse.pet.service import PetCare, PetKeeper, PetReactions, PetViews, Quests
+from muse.pet.service import (
+    HungerWatch,
+    PetCare,
+    PetKeeper,
+    PetPushes,
+    PetReactions,
+    PetViews,
+    QuestAlbums,
+    Quests,
+)
 from muse.settings import Settings
 
 
@@ -100,3 +109,6 @@ class ContextsProvider(Provider):
     pet_views = provide(PetViews)
     pet_care = provide(PetCare)
     pet_reactions = provide(PetReactions)
+    quest_albums = provide(QuestAlbums)
+    pet_pushes = provide(PetPushes)
+    hunger_watch = provide(HungerWatch)

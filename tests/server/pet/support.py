@@ -52,7 +52,24 @@ class PetTable:
         )
 
 
-def catalog_ids(settings: Settings, sql: str) -> list[int]:
+def catalog_rows(
+    settings: Settings, sql: str, params: tuple[Any, ...] = ()
+) -> list[tuple[Any, ...]]:
     uri = f"file:{settings.paths.catalog_db.as_posix()}?mode=ro"
     with closing(sqlite3.connect(uri, uri=True)) as db:
-        return [row[0] for row in db.execute(sql)]
+        return db.execute(sql, params).fetchall()
+
+
+def catalog_ids(settings: Settings, sql: str) -> list[int]:
+    return [row[0] for row in catalog_rows(settings, sql)]
+
+
+def play(track_id: int, listened_ms: int, started_at: int) -> dict[str, Any]:
+    return {
+        "track_id": track_id,
+        "started_at": started_at,
+        "listened_ms": listened_ms,
+        "completed": False,
+        "skipped": False,
+        "source": "other",
+    }

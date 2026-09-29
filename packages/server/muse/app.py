@@ -1,6 +1,8 @@
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
+import anyio
+import structlog
 from dishka import AsyncContainer, Provider, make_async_container
 from dishka.integrations.litestar import LitestarProvider, setup_dishka
 from litestar import Litestar
@@ -17,7 +19,9 @@ from muse.http.spa import api_not_found, spa
 from muse.identity.domain import Users
 from muse.identity.routes import router as identity
 from muse.notifications.routes import router as notifications
+from muse.pet.domain import HUNGER_CHECK_S
 from muse.pet.routes import router as pet
+from muse.pet.service import HungerWatch
 from muse.settings import Settings
 from muse.shared.tasks import BackgroundRunner
 from muse.wiring.contexts import ContextsProvider
@@ -25,6 +29,18 @@ from muse.wiring.core import CoreProvider
 from muse.wiring.events import EventsProvider
 
 ROUTERS = (identity, catalog, artwork, activity, notifications, pet)
+
+log = structlog.get_logger()
+
+
+async def watch_hunger(container: AsyncContainer) -> None:
+    while True:
+        await anyio.sleep(HUNGER_CHECK_S)
+        try:
+            async with container() as request:
+                await (await request.get(HungerWatch)).check()
+        except Exception:
+            log.exception("pet: hunger check failed")
 
 
 def lifespan(
@@ -37,6 +53,7 @@ def lifespan(
         async with runner.running():
             if jobs:
                 runner.spawn((await container.get(Artwork)).warm, name="artwork")
+                runner.spawn(watch_hunger, container, name="pet")
             yield
 
     return run
