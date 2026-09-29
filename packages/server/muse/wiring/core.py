@@ -13,6 +13,8 @@ from muse.identity.infra.users_file import UsersFile
 from muse.notifications.domain import PushSender
 from muse.notifications.infra.sender import RecordingSender, WebPushSender
 from muse.notifications.infra.vapid import application_server_key
+from muse.pet.domain import ListeningTogether
+from muse.pet.infra.listening import NobodyListensTogether
 from muse.settings import Settings
 from muse.shared.cache import Cache, NullCache, RedisCache
 from muse.shared.clock import Clock, ZonedClock
@@ -31,6 +33,7 @@ class CoreProvider(Provider):
         self._settings = settings
 
     runner = provide(BackgroundRunner, scope=Scope.APP)
+    listening_together = provide(NobodyListensTogether, provides=ListeningTogether, scope=Scope.APP)
 
     @provide(scope=Scope.APP)
     def limiter(self) -> AttemptLimiter:

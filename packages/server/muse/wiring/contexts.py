@@ -28,6 +28,10 @@ from muse.identity.service import LoginService, SessionService
 from muse.notifications.domain import SubscriptionRepository
 from muse.notifications.infra.sql import SqlSubscriptions
 from muse.notifications.service import Notifier, PushReactions, PushSubscriptions
+from muse.pet.domain import PetRepository, QuestRepository
+from muse.pet.infra.quests import SqlQuests
+from muse.pet.infra.sql import SqlPets
+from muse.pet.service import PetCare, PetKeeper, PetReactions, PetViews, Quests
 from muse.settings import Settings
 
 
@@ -88,3 +92,11 @@ class ContextsProvider(Provider):
     notifier = provide(Notifier)
     push_subscriptions = provide(PushSubscriptions)
     push_reactions = provide(PushReactions)
+
+    pet_store = provide(SqlPets, provides=PetRepository)
+    quest_store = provide(SqlQuests, provides=QuestRepository)
+    pet_keeper = provide(PetKeeper)
+    quests = provide(Quests)
+    pet_views = provide(PetViews)
+    pet_care = provide(PetCare)
+    pet_reactions = provide(PetReactions)

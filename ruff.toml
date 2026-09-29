@@ -27,7 +27,7 @@ select = [
     "PLR0913",
     "PLR0915",
 ]
-ignore = ["E501", "S101", "RUF001", "RUF002", "RUF003"]
+ignore = ["E501", "S101", "RUF001", "RUF002", "RUF003", "S311"]
 
 [lint.mccabe]
 max-complexity = 10
