@@ -5,6 +5,7 @@ from muse.notifications.service import PushReactions
 from muse.pet.domain import QuestAlbumChosen
 from muse.pet.service import PetPushes, PetReactions
 from muse.shared.events import EventBus
+from muse.together.domain import TogetherAccrued
 
 
 class EventsProvider(Provider):
@@ -22,4 +23,5 @@ class EventsProvider(Provider):
         bus.subscribe(PlayRecorded, reactions.music)
         bus.subscribe(LikeChanged, reactions.treat)
         bus.subscribe(QuestAlbumChosen, pushes.quest_album)
+        bus.subscribe(TogetherAccrued, reactions.together)
         return bus

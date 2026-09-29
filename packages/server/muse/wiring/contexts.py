@@ -42,6 +42,9 @@ from muse.pet.service import (
     Quests,
 )
 from muse.settings import Settings
+from muse.together.domain import LetterBox, TogetherLedger
+from muse.together.infra.sql import SqlLetters, SqlTogether
+from muse.together.service import Following, Live
 
 
 class ContextsProvider(Provider):
@@ -112,3 +115,8 @@ class ContextsProvider(Provider):
     quest_albums = provide(QuestAlbums)
     pet_pushes = provide(PetPushes)
     hunger_watch = provide(HungerWatch)
+
+    together_ledger = provide(SqlTogether, provides=TogetherLedger)
+    letter_box = provide(SqlLetters, provides=LetterBox)
+    live = provide(Live)
+    following = provide(Following)

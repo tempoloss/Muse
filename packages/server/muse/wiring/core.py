@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 import structlog
-from dishka import Provider, Scope, provide
+from dishka import AnyOf, Provider, Scope, provide
 from pywebpush import webpush
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -14,12 +14,13 @@ from muse.notifications.domain import PushSender
 from muse.notifications.infra.sender import RecordingSender, WebPushSender
 from muse.notifications.infra.vapid import application_server_key
 from muse.pet.domain import ListeningTogether
-from muse.pet.infra.listening import NobodyListensTogether
 from muse.settings import Settings
 from muse.shared.cache import Cache, NullCache, RedisCache
 from muse.shared.clock import Clock, ZonedClock
 from muse.shared.db import CatalogDb, UnitOfWork, catalog_engine, user_engine
 from muse.shared.tasks import BackgroundRunner
+from muse.together.domain import LiveBoard
+from muse.together.infra.live import LiveRegistry
 
 HTTP_TIMEOUT_S = 8
 USER_AGENT = "muse/1.0"
@@ -33,7 +34,9 @@ class CoreProvider(Provider):
         self._settings = settings
 
     runner = provide(BackgroundRunner, scope=Scope.APP)
-    listening_together = provide(NobodyListensTogether, provides=ListeningTogether, scope=Scope.APP)
+    live_registry = provide(
+        LiveRegistry, provides=AnyOf[LiveBoard, ListeningTogether], scope=Scope.APP
+    )
 
     @provide(scope=Scope.APP)
     def limiter(self) -> AttemptLimiter:

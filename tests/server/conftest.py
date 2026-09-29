@@ -1,6 +1,8 @@
 import json
 import shutil
+import sqlite3
 from collections.abc import AsyncIterator
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,15 @@ from muse.settings import HttpSettings, PathsSettings, PushSettings, Settings
 from muse.shared.db import user_engine
 from tests.fixtures.catalog import FixtureCatalog, build_catalog
 from tests.server.support import ORIGIN, PASSWORDS, browser, signed_in
+
+
+def playable_ids(library: FixtureCatalog, count: int) -> list[int]:
+    uri = f"file:{library.catalog_db.as_posix()}?mode=ro"
+    with closing(sqlite3.connect(uri, uri=True)) as db:
+        rows = db.execute(
+            "SELECT id FROM tracks WHERE status='ok' AND dur>60 ORDER BY id LIMIT ?", (count,)
+        ).fetchall()
+    return [row[0] for row in rows]
 
 
 @pytest.fixture(scope="session")
@@ -76,6 +87,11 @@ def web_dir(tmp_path: Path) -> Path:
 @pytest.fixture(scope="session")
 def library(tmp_path_factory: pytest.TempPathFactory) -> FixtureCatalog:
     return build_catalog(tmp_path_factory.mktemp("catalog"))
+
+
+@pytest.fixture
+def track_id(library: FixtureCatalog) -> int:
+    return playable_ids(library, 1)[0]
 
 
 @pytest.fixture

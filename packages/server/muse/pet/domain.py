@@ -22,6 +22,7 @@ PET_SLEEP_MS = 3 * HOUR_MS
 TURN_MS = 6 * HOUR_MS
 PET_MUSIC_DAY = 30
 MUSIC_FOOD = 2
+PET_TOGETHER_DAY = 40
 TREAT = {"food": 10, "joy": 10}
 CARE_BONUS = {"food": 10, "joy": 20, "energy": 10, "clean": 10}
 QUEST_REWARD = {"food": 20, "joy": 20, "energy": 20, "clean": 20}
@@ -99,6 +100,10 @@ def added(pet: Pet, **deltas: float) -> Pet:
     return replace(
         pet, **{stat: clamp(getattr(pet, stat) + delta) for stat, delta in deltas.items()}
     )
+
+
+def together_joy(seconds_before: float, seconds_after: float) -> float:
+    return min(PET_TOGETHER_DAY, seconds_after / 60) - min(PET_TOGETHER_DAY, seconds_before / 60)
 
 
 def hungry(pet: Pet) -> bool:

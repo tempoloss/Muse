@@ -38,6 +38,7 @@ from muse.pet.domain import (
     quest_view,
     sampled_likes,
     ticked,
+    together_joy,
     together_progress,
     turn_share,
     valid_name,
@@ -46,6 +47,7 @@ from muse.shared.clock import Clock
 from muse.shared.db import UnitOfWork
 from muse.shared.errors import DomainError
 from muse.shared.events import EventBus
+from muse.together.domain import TogetherAccrued
 
 
 class PetKeeper:
@@ -225,6 +227,11 @@ class PetReactions:
         now = self.clock.now_ms()
         await self.keeper.add(now, **TREAT)
         await self.pets.log(now, event.user, "treat", str(event.track_id))
+
+    async def together(self, event: TogetherAccrued) -> None:
+        joy = together_joy(event.seconds_before, event.seconds_after)
+        if joy > 0:
+            await self.keeper.add(self.clock.now_ms(), joy=joy)
 
 
 class QuestAlbums:

@@ -24,11 +24,12 @@ from muse.pet.routes import router as pet
 from muse.pet.service import HungerWatch
 from muse.settings import Settings
 from muse.shared.tasks import BackgroundRunner
+from muse.together.routes import router as together
 from muse.wiring.contexts import ContextsProvider
 from muse.wiring.core import CoreProvider
 from muse.wiring.events import EventsProvider
 
-ROUTERS = (identity, catalog, artwork, activity, notifications, pet)
+ROUTERS = (identity, catalog, artwork, activity, notifications, pet, together)
 
 log = structlog.get_logger()
 
