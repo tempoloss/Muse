@@ -25,6 +25,9 @@ from muse.catalog.service import Catalog
 from muse.daily.domain import DailyStore, TasteSource
 from muse.daily.infra.sql import SqlDailyStore, SqlTasteSource
 from muse.daily.service import DailyMaker, DailyPlaylists
+from muse.diagnostics.domain import PlayerLog
+from muse.diagnostics.infra.player_log import PlayerLogFile
+from muse.diagnostics.service import PlayerLogService
 from muse.discovery.domain import GenreTracks, ListeningHistory
 from muse.discovery.infra.sql import SqlGenreTracks, SqlListeningHistory
 from muse.discovery.service import Mixes, Radio, RadioModelCache, RadioModels
@@ -161,3 +164,9 @@ class ContextsProvider(Provider):
     continue_cards = provide(ContinueCards)
     home_feed = provide(HomeFeed)
     home_refresh = provide(HomeRefresh)
+
+    player_log_service = provide(PlayerLogService)
+
+    @provide(scope=Scope.APP)
+    def player_log(self, settings: Settings) -> PlayerLog:
+        return PlayerLogFile(settings.paths.player_log)
