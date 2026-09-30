@@ -1,8 +1,12 @@
+import random
+
 from muse.activity.domain import LikeChanged
 from muse.catalog.service import Catalog
 from muse.identity.domain import Users
 from muse.notifications.domain import (
     BAD_ENDPOINT,
+    LETTER_BODY_CHARS,
+    LETTER_TITLES,
     PushMessage,
     PushSender,
     Subscription,
@@ -12,6 +16,7 @@ from muse.notifications.domain import (
 from muse.shared.clock import Clock
 from muse.shared.db import UnitOfWork
 from muse.shared.errors import DomainError
+from muse.together.domain import LetterSent, OursChanged
 
 
 class Notifier:
@@ -66,4 +71,32 @@ class PushReactions:
             f"Теперь нам обоим нравится\n🎵 {track['title']} · {track['artist']}",
             "/us",
             f"like-{event.track_id}",
+        )
+
+    async def letter(self, event: LetterSent) -> None:
+        track = (await self.catalog.track_rows([event.track_id])).get(event.track_id)
+        sender = self.users.get(event.sender)
+        if track is None or sender is None:
+            return
+        await self.notifier.notify(
+            event.recipient,
+            random.choice(LETTER_TITLES).format(sender.beast),
+            f"{event.text[:LETTER_BODY_CHARS]}\n🎵 {track['title']} · {track['artist']}",
+            "/?letters=1",
+            f"letter-{event.letter_id}",
+        )
+
+    async def ours_added(self, event: OursChanged) -> None:
+        if not event.added_new:
+            return
+        track = (await self.catalog.track_rows([event.track_id])).get(event.track_id)
+        adder = self.users.get(event.user)
+        if track is None or adder is None:
+            return
+        await self.notifier.notify(
+            self.users.partner_id(event.user),
+            f"{adder.beast} добавил в наш плейлист",
+            f"🎵 {track['title']} · {track['artist']}",
+            "/ours",
+            f"ours-{event.track_id}",
         )

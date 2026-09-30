@@ -42,9 +42,10 @@ from muse.pet.service import (
     Quests,
 )
 from muse.settings import Settings
-from muse.together.domain import LetterBox, TogetherLedger
-from muse.together.infra.sql import SqlLetters, SqlTogether
-from muse.together.service import Following, Live
+from muse.together.domain import LetterBox, NotesSource, OursList, TogetherLedger
+from muse.together.infra.notes import NotesFiles
+from muse.together.infra.sql import SqlLetters, SqlOurs, SqlTogether
+from muse.together.service import Following, Letters, Live, Notes, Ours
 
 
 class ContextsProvider(Provider):
@@ -118,5 +119,13 @@ class ContextsProvider(Provider):
 
     together_ledger = provide(SqlTogether, provides=TogetherLedger)
     letter_box = provide(SqlLetters, provides=LetterBox)
+    ours_list = provide(SqlOurs, provides=OursList)
     live = provide(Live)
     following = provide(Following)
+    letters = provide(Letters)
+    ours = provide(Ours)
+    notes = provide(Notes)
+
+    @provide(scope=Scope.APP)
+    def notes_source(self, settings: Settings) -> NotesSource:
+        return NotesFiles(settings.paths.notes_dir)

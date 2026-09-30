@@ -1,3 +1,4 @@
+import random
 from typing import Any
 
 import anyio
@@ -10,12 +11,19 @@ from muse.shared.errors import DomainError
 from muse.shared.events import EventBus
 from muse.together.domain import (
     FOLLOW_POLL_S,
+    NO_LETTER,
     PARTNER_FOLLOWS,
     Beat,
     LetterBox,
+    LetterSent,
     LiveBoard,
+    Note,
+    NotesSource,
+    OursChanged,
+    OursList,
     TogetherAccrued,
     TogetherLedger,
+    letter_text,
     live_partner,
     mirror,
     mirrored_track_id,
@@ -103,3 +111,88 @@ class Following:
             return None
         track = (await self.catalog.track_rows([track_id])).get(track_id)
         return mirror(beat, track, now) if track else None
+
+
+class Letters:
+    def __init__(
+        self,
+        letters: LetterBox,
+        catalog: Catalog,
+        users: Users,
+        clock: Clock,
+        bus: EventBus,
+        uow: UnitOfWork,
+    ) -> None:
+        self.letters = letters
+        self.catalog = catalog
+        self.users = users
+        self.clock = clock
+        self.bus = bus
+        self.uow = uow
+
+    async def send(self, user_id: str, track_id: int, text: str) -> dict[str, int]:
+        body = letter_text(text)
+        await self.catalog.playable_duration(track_id)
+        recipient = self.users.partner_id(user_id)
+        letter_id = await self.letters.send(user_id, recipient, track_id, body, self.clock.now_ms())
+        await self.bus.publish(LetterSent(user_id, recipient, letter_id, track_id, body))
+        await self.uow.commit()
+        return {"id": letter_id}
+
+    async def listing(self, user_id: str) -> dict[str, list[dict[str, Any]]]:
+        received = await self.letters.received(user_id)
+        sent = await self.letters.sent(user_id)
+        tracks = await self.catalog.track_rows([letter.track_id for letter in (*received, *sent)])
+        return {
+            "received": [letter.view(tracks) for letter in received],
+            "sent": [letter.view(tracks) for letter in sent],
+        }
+
+    async def mark_read(self, user_id: str, letter_id: int) -> None:
+        if not await self.letters.addressed_to(letter_id, user_id):
+            raise DomainError(NO_LETTER)
+        await self.letters.mark_read(letter_id, self.clock.now_ms())
+        await self.uow.commit()
+
+
+class Ours:
+    def __init__(
+        self, ours: OursList, catalog: Catalog, clock: Clock, bus: EventBus, uow: UnitOfWork
+    ) -> None:
+        self.ours = ours
+        self.catalog = catalog
+        self.clock = clock
+        self.bus = bus
+        self.uow = uow
+
+    async def listing(self) -> dict[str, list[Any]]:
+        marks = await self.ours.marks()
+        rows = await self.catalog.track_rows([mark.track_id for mark in marks])
+        tracks = [
+            {**rows[mark.track_id], "added_by": mark.added_by, "added_at": mark.added_at}
+            for mark in marks
+            if mark.track_id in rows
+        ]
+        return {"tracks": tracks, "albums": await self.catalog.cover_ids(tracks)}
+
+    async def add(self, user_id: str, track_id: int) -> None:
+        await self.catalog.playable_duration(track_id)
+        added = await self.ours.add(track_id, user_id, self.clock.now_ms())
+        await self.bus.publish(OursChanged(user_id, track_id, added_new=added))
+        await self.uow.commit()
+
+    async def remove(self, user_id: str, track_id: int) -> None:
+        await self.ours.remove(track_id)
+        await self.bus.publish(OursChanged(user_id, track_id, added_new=False))
+        await self.uow.commit()
+
+
+class Notes:
+    def __init__(self, source: NotesSource, clock: Clock) -> None:
+        self.source = source
+        self.clock = clock
+
+    async def daily(self, user_id: str) -> dict[str, list[Note]]:
+        pool = await self.source.notes(user_id)
+        shuffle = random.Random(f"{user_id}:notes:{self.clock.today()}")
+        return {"notes": shuffle.sample(pool, len(pool))}

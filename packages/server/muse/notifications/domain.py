@@ -5,6 +5,8 @@ from typing import Protocol
 ENDPOINT_SCHEME = "https://"
 ENDPOINT_MAX_CHARS = 1000
 BAD_ENDPOINT = "bad endpoint"
+LETTER_TITLES = ("{} принёс записку", "{} прибежал с запиской", "{} оставил тебе записку")
+LETTER_BODY_CHARS = 120
 
 
 @dataclass(frozen=True, slots=True)

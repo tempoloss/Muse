@@ -95,6 +95,11 @@ def track_id(library: FixtureCatalog) -> int:
 
 
 @pytest.fixture
+def other_track_id(library: FixtureCatalog) -> int:
+    return playable_ids(library, 2)[1]
+
+
+@pytest.fixture
 def settings(
     tmp_path: Path,
     web_dir: Path,

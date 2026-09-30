@@ -10,6 +10,7 @@ from muse.pet.domain import (
     CARE,
     CARE_BONUS,
     DONE,
+    GIFT_JOY,
     HUNGER_PUSH_EVERY_MS,
     MUSIC_FOOD,
     NO_SUCH_ACTION,
@@ -47,7 +48,7 @@ from muse.shared.clock import Clock
 from muse.shared.db import UnitOfWork
 from muse.shared.errors import DomainError
 from muse.shared.events import EventBus
-from muse.together.domain import TogetherAccrued
+from muse.together.domain import LetterSent, TogetherAccrued
 
 
 class PetKeeper:
@@ -232,6 +233,11 @@ class PetReactions:
         joy = together_joy(event.seconds_before, event.seconds_after)
         if joy > 0:
             await self.keeper.add(self.clock.now_ms(), joy=joy)
+
+    async def gift(self, event: LetterSent) -> None:
+        now = self.clock.now_ms()
+        await self.keeper.add(now, joy=GIFT_JOY)
+        await self.pets.log(now, event.sender, "gift", str(event.letter_id))
 
 
 class QuestAlbums:

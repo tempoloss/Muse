@@ -24,6 +24,7 @@ PET_MUSIC_DAY = 30
 MUSIC_FOOD = 2
 PET_TOGETHER_DAY = 40
 TREAT = {"food": 10, "joy": 10}
+GIFT_JOY = 15
 CARE_BONUS = {"food": 10, "joy": 20, "energy": 10, "clean": 10}
 QUEST_REWARD = {"food": 20, "joy": 20, "energy": 20, "clean": 20}
 NAME_MAX_CHARS = 24
