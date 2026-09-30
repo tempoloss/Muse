@@ -25,6 +25,9 @@ from muse.catalog.service import Catalog
 from muse.identity.domain import SessionStore
 from muse.identity.infra.sql import SqlSessions
 from muse.identity.service import LoginService, SessionService
+from muse.insights.domain import PlayStats
+from muse.insights.infra.sql import SqlStats
+from muse.insights.service import ListeningStats
 from muse.notifications.domain import SubscriptionRepository
 from muse.notifications.infra.sql import SqlSubscriptions
 from muse.notifications.service import Notifier, PushReactions, PushSubscriptions
@@ -129,3 +132,6 @@ class ContextsProvider(Provider):
     @provide(scope=Scope.APP)
     def notes_source(self, settings: Settings) -> NotesSource:
         return NotesFiles(settings.paths.notes_dir)
+
+    play_stats = provide(SqlStats, provides=PlayStats)
+    listening_stats = provide(ListeningStats)

@@ -18,6 +18,7 @@ from muse.http.policy import HttpPolicy
 from muse.http.spa import api_not_found, spa
 from muse.identity.domain import Users
 from muse.identity.routes import router as identity
+from muse.insights.routes import router as insights
 from muse.notifications.routes import router as notifications
 from muse.pet.domain import HUNGER_CHECK_S
 from muse.pet.routes import router as pet
@@ -29,7 +30,7 @@ from muse.wiring.contexts import ContextsProvider
 from muse.wiring.core import CoreProvider
 from muse.wiring.events import EventsProvider
 
-ROUTERS = (identity, catalog, artwork, activity, notifications, pet, together)
+ROUTERS = (identity, catalog, artwork, activity, notifications, pet, together, insights)
 
 log = structlog.get_logger()
 
