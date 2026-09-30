@@ -14,6 +14,7 @@ from muse.artwork.service import Artwork
 from muse.catalog.routes import router as catalog
 from muse.daily.routes import router as daily
 from muse.discovery.routes import router as discovery
+from muse.home.routes import router as home
 from muse.http.auth import SessionAuthMiddleware
 from muse.http.errors import EXCEPTION_HANDLERS
 from muse.http.policy import HttpPolicy
@@ -43,6 +44,7 @@ ROUTERS = (
     insights,
     discovery,
     daily,
+    home,
 )
 
 log = structlog.get_logger()

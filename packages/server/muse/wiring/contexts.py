@@ -28,6 +28,9 @@ from muse.daily.service import DailyMaker, DailyPlaylists
 from muse.discovery.domain import GenreTracks, ListeningHistory
 from muse.discovery.infra.sql import SqlGenreTracks, SqlListeningHistory
 from muse.discovery.service import Mixes, Radio, RadioModelCache, RadioModels
+from muse.home.domain import HomeQueries
+from muse.home.infra.sql import SqlHome
+from muse.home.service import ContinueCards, HomeFeed, HomeRefresh
 from muse.identity.domain import SessionStore
 from muse.identity.infra.sql import SqlSessions
 from muse.identity.service import LoginService, SessionService
@@ -153,3 +156,8 @@ class ContextsProvider(Provider):
     daily_taste = provide(SqlTasteSource, provides=TasteSource)
     daily_playlists = provide(DailyPlaylists)
     daily_maker = provide(DailyMaker)
+
+    home_queries = provide(SqlHome, provides=HomeQueries)
+    continue_cards = provide(ContinueCards)
+    home_feed = provide(HomeFeed)
+    home_refresh = provide(HomeRefresh)

@@ -1,6 +1,7 @@
 from dishka import Provider, Scope, decorate, provide
 
 from muse.activity.domain import LikeChanged, PlayRecorded
+from muse.home.service import HomeRefresh
 from muse.notifications.service import PushReactions
 from muse.pet.domain import QuestAlbumChosen
 from muse.pet.service import PetPushes, PetReactions
@@ -27,4 +28,11 @@ class EventsProvider(Provider):
         bus.subscribe(QuestAlbumChosen, pushes.quest_album)
         bus.subscribe(TogetherAccrued, reactions.together)
         bus.subscribe(LetterSent, reactions.gift)
+        return bus
+
+    @decorate
+    def home(self, bus: EventBus, refresh: HomeRefresh) -> EventBus:
+        bus.subscribe(PlayRecorded, refresh.drop)
+        bus.subscribe(LikeChanged, refresh.drop)
+        bus.subscribe(OursChanged, refresh.drop)
         return bus
