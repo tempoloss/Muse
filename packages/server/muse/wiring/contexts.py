@@ -22,6 +22,9 @@ from muse.catalog.infra.library import LibraryFiles
 from muse.catalog.infra.playlists import PlaylistFiles
 from muse.catalog.infra.sql import SqlCatalog
 from muse.catalog.service import Catalog
+from muse.discovery.domain import GenreTracks, ListeningHistory
+from muse.discovery.infra.sql import SqlGenreTracks, SqlListeningHistory
+from muse.discovery.service import Mixes, Radio, RadioModelCache, RadioModels
 from muse.identity.domain import SessionStore
 from muse.identity.infra.sql import SqlSessions
 from muse.identity.service import LoginService, SessionService
@@ -135,3 +138,10 @@ class ContextsProvider(Provider):
 
     play_stats = provide(SqlStats, provides=PlayStats)
     listening_stats = provide(ListeningStats)
+
+    radio_model_cache = provide(RadioModelCache, scope=Scope.APP)
+    radio_models = provide(RadioModels, scope=Scope.APP)
+    listening_history = provide(SqlListeningHistory, provides=ListeningHistory)
+    genre_tracks = provide(SqlGenreTracks, provides=GenreTracks)
+    radio = provide(Radio)
+    mixes = provide(Mixes)

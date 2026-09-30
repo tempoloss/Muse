@@ -12,6 +12,7 @@ from muse.activity.routes import router as activity
 from muse.artwork.routes import router as artwork
 from muse.artwork.service import Artwork
 from muse.catalog.routes import router as catalog
+from muse.discovery.routes import router as discovery
 from muse.http.auth import SessionAuthMiddleware
 from muse.http.errors import EXCEPTION_HANDLERS
 from muse.http.policy import HttpPolicy
@@ -30,7 +31,17 @@ from muse.wiring.contexts import ContextsProvider
 from muse.wiring.core import CoreProvider
 from muse.wiring.events import EventsProvider
 
-ROUTERS = (identity, catalog, artwork, activity, notifications, pet, together, insights)
+ROUTERS = (
+    identity,
+    catalog,
+    artwork,
+    activity,
+    notifications,
+    pet,
+    together,
+    insights,
+    discovery,
+)
 
 log = structlog.get_logger()
 
