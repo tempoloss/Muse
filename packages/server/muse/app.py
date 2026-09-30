@@ -12,6 +12,7 @@ from muse.activity.routes import router as activity
 from muse.artwork.routes import router as artwork
 from muse.artwork.service import Artwork
 from muse.catalog.routes import router as catalog
+from muse.daily.routes import router as daily
 from muse.discovery.routes import router as discovery
 from muse.http.auth import SessionAuthMiddleware
 from muse.http.errors import EXCEPTION_HANDLERS
@@ -41,6 +42,7 @@ ROUTERS = (
     together,
     insights,
     discovery,
+    daily,
 )
 
 log = structlog.get_logger()
@@ -72,12 +74,14 @@ def lifespan(
     return run
 
 
+def app_providers(settings: Settings) -> tuple[Provider, ...]:
+    return CoreProvider(settings), ContextsProvider(), EventsProvider()
+
+
 def create_app(
     settings: Settings, providers: Sequence[Provider] = (), *, jobs: bool = False
 ) -> Litestar:
-    container = make_async_container(
-        CoreProvider(settings), ContextsProvider(), EventsProvider(), LitestarProvider(), *providers
-    )
+    container = make_async_container(*app_providers(settings), LitestarProvider(), *providers)
     app = Litestar(
         route_handlers=[*ROUTERS, api_not_found, spa],
         middleware=[DefineMiddleware(SessionAuthMiddleware, exclude_from_auth_key="skip_auth")],

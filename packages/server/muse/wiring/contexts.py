@@ -22,6 +22,9 @@ from muse.catalog.infra.library import LibraryFiles
 from muse.catalog.infra.playlists import PlaylistFiles
 from muse.catalog.infra.sql import SqlCatalog
 from muse.catalog.service import Catalog
+from muse.daily.domain import DailyStore, TasteSource
+from muse.daily.infra.sql import SqlDailyStore, SqlTasteSource
+from muse.daily.service import DailyMaker, DailyPlaylists
 from muse.discovery.domain import GenreTracks, ListeningHistory
 from muse.discovery.infra.sql import SqlGenreTracks, SqlListeningHistory
 from muse.discovery.service import Mixes, Radio, RadioModelCache, RadioModels
@@ -145,3 +148,8 @@ class ContextsProvider(Provider):
     genre_tracks = provide(SqlGenreTracks, provides=GenreTracks)
     radio = provide(Radio)
     mixes = provide(Mixes)
+
+    daily_store = provide(SqlDailyStore, provides=DailyStore)
+    daily_taste = provide(SqlTasteSource, provides=TasteSource)
+    daily_playlists = provide(DailyPlaylists)
+    daily_maker = provide(DailyMaker)

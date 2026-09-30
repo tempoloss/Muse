@@ -1,11 +1,13 @@
 import logging
 import sys
+from typing import TextIO
 
 import structlog
 
 
-def configure_logging() -> None:
-    logging.basicConfig(format="%(message)s", stream=sys.stdout, level=logging.INFO)
+def configure_logging(stream: TextIO | None = None) -> None:
+    target = sys.stdout if stream is None else stream
+    logging.basicConfig(format="%(message)s", stream=target, level=logging.INFO)
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
@@ -15,6 +17,6 @@ def configure_logging() -> None:
             structlog.processors.JSONRenderer(ensure_ascii=False),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
-        logger_factory=structlog.PrintLoggerFactory(sys.stdout),
+        logger_factory=structlog.PrintLoggerFactory(target),
         cache_logger_on_first_use=False,
     )
