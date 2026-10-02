@@ -1,0 +1,26 @@
+[paths]
+library_dir = "D:/music/lib"
+catalog_db = "D:/music/state.sqlite"
+work_dir = "D:/music/agent"        # agent.log, catalog-publish.sqlite, catalog.md5, prompt.md, backups/
+[rclone]
+exe = "rclone"
+library_remote = "storage:bucket/lib"
+catalog_remote = "storage:bucket/catalog/state.sqlite"
+backups_remote = "storage:bucket/backups"
+transfers = 16
+max_delete = 200
+[vps]
+agent_host = "vps-agent"           # ssh alias bound to the forced-command key
+[daily]
+hour = 5
+timezone = "UTC"
+command = ["llm-cli", "--model", "{model}", "--prompt-file", "{prompt_file}"]
+models = ["model-a"]
+timeout_s = 900
+retry_s = 1800
+[schedule]
+publish_every_s = 600
+backup_keep_days = 30
+[deploy]
+admin_host = "vps"
+web_dist = "D:/music/web/dist"
