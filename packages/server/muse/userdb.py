@@ -1,4 +1,6 @@
+import os
 import sqlite3
+import stat
 from contextlib import closing
 from pathlib import Path
 
@@ -43,6 +45,9 @@ def snapshot_database(user_db: Path, snapshot: Path) -> None:
         raise UserDatabaseError(f"no user database at {user_db}")
     partial = snapshot.with_name(f"{snapshot.name}.part")
     partial.unlink(missing_ok=True)
+    mode = stat.S_IMODE(user_db.stat().st_mode)
+    os.close(os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode))
+    partial.chmod(mode)
     copy_database(user_db, partial)
     partial.replace(snapshot)
 

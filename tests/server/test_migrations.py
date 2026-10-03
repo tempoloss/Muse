@@ -1,4 +1,6 @@
 import sqlite3
+import stat
+import sys
 from pathlib import Path
 
 import pytest
@@ -139,3 +141,14 @@ def test_restore_without_a_snapshot_leaves_the_database_alone(configured: Path) 
     assert main(["db", "restore"]) == 1
 
     assert query(configured, "SELECT * FROM likes") == [("bob", 7, 2000)]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="needs POSIX file modes")
+def test_the_snapshot_is_as_private_as_the_database(configured: Path) -> None:
+    assert main(["db", "upgrade"]) == 0
+    configured.chmod(0o600)
+
+    assert main(["db", "snapshot"]) == 0
+
+    snapshot = configured.with_name("muse.pre-upgrade.sqlite")
+    assert stat.S_IMODE(snapshot.stat().st_mode) == 0o600
