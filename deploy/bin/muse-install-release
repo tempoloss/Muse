@@ -2,6 +2,7 @@
 set -eu
 sha="${1:-}"
 case "$sha" in ''|*[!0-9a-f]*) echo "bad sha" >&2; exit 2 ;; esac
+limit=120
 rel=$(mktemp -d "/opt/muse/releases/$sha.XXXXXX")
 tar -x -C "$rel"
 export UV_PYTHON_INSTALL_DIR=/opt/muse/python UV_CACHE_DIR=/var/cache/uv UV_PROJECT_ENVIRONMENT="$rel/venv"
@@ -9,7 +10,7 @@ uv sync --frozen --no-dev --package muse-server --project "$rel/src"
 chmod -R a+rX "$rel" /opt/muse/python
 prev=$(readlink -e /opt/muse/current 2>/dev/null || true)
 muse() {
-  runuser -u muse -- env MUSE_CONFIG=/etc/muse/muse.toml "$rel/venv/bin/muse" "$@"
+  timeout -k 10 "$limit" runuser -u muse -- env MUSE_CONFIG=/etc/muse/muse.toml "$rel/venv/bin/muse" "$@"
 }
 point() {
   ln -sfn "$1" /opt/muse/current.new && mv -T /opt/muse/current.new /opt/muse/current
@@ -17,7 +18,7 @@ point() {
 healthy() {
   systemctl restart muse || return 1
   i=0
-  until [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4535/)" = "200" ]; do
+  until [ "$(curl -s -o /dev/null --max-time 5 -w '%{http_code}' http://127.0.0.1:4535/)" = "200" ]; do
     i=$((i+1))
     [ "$i" -lt 20 ] || return 1
     sleep 1
@@ -38,7 +39,10 @@ if muse db upgrade && point "$rel" && healthy; then
 fi
 echo "release $sha did not come up" >&2
 [ -n "$prev" ] || exit 1
-systemctl stop muse || true
+if ! systemctl stop muse; then
+  echo "release $sha would not stop; the database is left as it is" >&2
+  exit 1
+fi
 point "$prev"
 muse db restore || { echo "database restore failed; muse stays stopped" >&2; exit 1; }
 rm -rf "$rel"
