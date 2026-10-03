@@ -50,6 +50,8 @@ def sync_command(cfg: AgentConfig, allow_deletes: bool) -> list[str]:
         "--checkers",
         workers,
         "--fast-list",
+        "--update",
+        "--use-server-modtime",
         "--max-delete",
         str(max_delete),
         *excludes,
