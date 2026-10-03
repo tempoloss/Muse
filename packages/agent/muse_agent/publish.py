@@ -14,12 +14,12 @@ log = logging.getLogger(__name__)
 
 
 def publish(cfg: AgentConfig, allow_deletes: bool = False, run: Runner = run_logged) -> bool:
+    snapshot = cfg.paths.work_dir / SNAPSHOT_NAME
+    stats = make_snapshot(cfg.paths.catalog_db, cfg.paths.library_dir, snapshot)
     code = run(sync_command(cfg, allow_deletes))
     if code != 0:
         log.warning("publish: library sync failed rc=%d", code)
         return False
-    snapshot = cfg.paths.work_dir / SNAPSHOT_NAME
-    stats = make_snapshot(cfg.paths.catalog_db, cfg.paths.library_dir, snapshot)
     summary = f"rows={stats.rows} rewritten={stats.rewritten} missing={stats.missing}"
     digest = md5_of(snapshot)
     record = cfg.paths.work_dir / PUBLISHED_MD5_NAME

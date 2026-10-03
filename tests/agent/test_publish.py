@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+from collections.abc import Sequence
 from contextlib import closing
 from pathlib import Path
 
@@ -40,7 +41,26 @@ def test_a_failed_library_sync_publishes_no_catalog(
 
     assert rclone.verbs == ["sync"]
     assert "publish: library sync failed rc=7" in caplog.messages
-    assert list(cfg.paths.work_dir.iterdir()) == []
+    assert not (cfg.paths.work_dir / "catalog.md5").exists()
+
+
+def test_a_track_finished_during_the_sync_waits_for_the_next_publish(cfg: AgentConfig) -> None:
+    rclone = FakeRclone()
+
+    def sync_while_a_download_finishes(argv: Sequence[str]) -> int:
+        if argv[1] == "sync":
+            touch(cfg.paths.library_dir, "Pop/Y/b.mp3")
+            with closing(sqlite3.connect(cfg.paths.catalog_db)) as db:
+                late = stored_path(cfg.paths.library_dir, "Pop/Y/b.mp3")
+                db.execute("INSERT INTO tracks(path, status) VALUES (?, 'ok')", (late,))
+                db.commit()
+        return rclone(argv)
+
+    assert publish(cfg, run=sync_while_a_download_finishes) is True
+    assert stored_paths(Path(rclone.calls[1][2])) == ["Indie/X/a.mp3"]
+
+    assert publish(cfg, run=rclone) is True
+    assert stored_paths(Path(rclone.calls[3][2])) == ["Indie/X/a.mp3", "Pop/Y/b.mp3"]
 
 
 def test_the_library_is_synced_before_the_rewritten_catalog_is_uploaded(cfg: AgentConfig) -> None:
