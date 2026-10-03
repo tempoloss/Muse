@@ -28,7 +28,7 @@ def pull_backup(
     part = archive.with_name(f"{archive.name}.part")
     rclone = cfg.rclone
     try:
-        download((remote or ssh(cfg.vps.agent_host))("backup"), part)
+        download((remote or ssh(cfg.vps.agent_host))(f"backup {day.isoformat()}"), part)
         verify(part)
         code = run([rclone.exe, "copyto", str(part), remote_file(rclone.backups_remote, archive)])
         if code != 0:

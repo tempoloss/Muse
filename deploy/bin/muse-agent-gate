@@ -1,16 +1,20 @@
 #!/bin/sh
 set -eu
 set -f; set -- ${SSH_ORIGINAL_COMMAND:-}; set +f
+day() {
+  case "${1:-}" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+    *) echo "bad day" >&2; exit 2 ;;
+  esac
+}
 case "${1:-}" in
   backup)
-    f=$(ls -1t /var/backups/muse/muse-*.tar.gz 2>/dev/null | head -n 1)
-    [ -n "$f" ] || { echo "no backup yet" >&2; exit 1; }
+    day "${2:-}"
+    f=/var/backups/muse/muse-$2.tar.gz
+    [ -f "$f" ] || { echo "no backup for $2 yet" >&2; exit 1; }
     exec cat "$f" ;;
   daily-remote)
-    case "${2:-}" in
-      [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
-      *) echo "bad day" >&2; exit 2 ;;
-    esac
+    day "${2:-}"
     exec runuser -u muse -- env MUSE_CONFIG=/etc/muse/muse.toml /opt/muse/current/venv/bin/muse daily-remote "$2" ;;
   *) echo "denied" >&2; exit 1 ;;
 esac

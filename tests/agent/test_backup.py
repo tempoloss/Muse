@@ -20,7 +20,7 @@ from pathlib import Path
 payload, code, verb = sys.argv[1], int(sys.argv[2]), sys.argv[3]
 sys.stdout.buffer.write(Path(payload).read_bytes())
 sys.stdout.flush()
-if verb != "backup":
+if verb != "backup 2026-10-03":
     sys.exit("denied")
 if code:
     sys.exit("no backup yet")
