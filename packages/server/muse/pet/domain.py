@@ -3,12 +3,11 @@ import random
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date
-from typing import Any, Protocol
+from typing import Protocol, TypedDict
 
+from muse.catalog.domain import AlbumCard, Track
 from muse.shared.errors import DomainError
 from muse.shared.events import Event
-
-type Row = dict[str, Any]
 
 PET_STATS = ("food", "joy", "energy", "clean")
 PET_AWAKE = {"food": -4, "joy": -3, "energy": -2.5, "clean": -2}
@@ -176,11 +175,65 @@ def cared(pet: Pet, action: str, half: float, now: int) -> Care:
     return CARE_EFFECTS[action](pet, half, now)
 
 
-def pet_view(pet: Pet, together: bool, quest: Row, log: list[Row]) -> Row:
+class QuestAlbum(TypedDict):
+    id: int
+    name: str
+    artist: str
+    ntracks: int
+    need: int
+
+
+class QuestPart(TypedDict):
+    user: str
+    progress: int
+    goal: int
+
+
+class QuestView(TypedDict):
+    kind: str
+    text: str
+    progress: int
+    goal: int
+    done: bool
+    album: QuestAlbum | None
+    track: Track | None
+    parts: list[QuestPart] | None
+    picked_by: str | None
+
+
+class LogEntry(TypedDict):
+    at: int
+    user: str | None
+    action: str
+
+
+class PetView(TypedDict):
+    name: str | None
+    born_at: int
+    food: int
+    joy: int
+    energy: int
+    clean: int
+    sick: bool
+    asleep: bool
+    mood: str
+    together_now: bool
+    quest: QuestView
+    log: list[LogEntry]
+
+
+class CaredView(PetView):
+    halved: bool
+
+
+def pet_view(pet: Pet, together: bool, quest: QuestView, log: list[LogEntry]) -> PetView:
     return {
         "name": pet.name,
         "born_at": pet.born_at,
-        **{stat: round(getattr(pet, stat)) for stat in PET_STATS},
+        "food": round(pet.food),
+        "joy": round(pet.joy),
+        "energy": round(pet.energy),
+        "clean": round(pet.clean),
         "sick": pet.sick,
         "asleep": bool(pet.asleep_until),
         "mood": mood(pet, together),
@@ -202,16 +255,16 @@ class QuestProgress:
     text: str
     progress: int
     goal: int
-    album: Row | None = None
-    track: Row | None = None
-    parts: list[Row] | None = None
+    album: QuestAlbum | None = None
+    track: Track | None = None
+    parts: list[QuestPart] | None = None
 
 
 def quest_kind(today: date) -> str:
     return random.Random(f"quest:{today}").choice(sorted(QUESTS))
 
 
-def drawn_album(albums: Sequence[Row], today: date) -> Row | None:
+def drawn_album(albums: Sequence[AlbumCard], today: date) -> AlbumCard | None:
     pool = [
         album
         for album in albums
@@ -220,10 +273,12 @@ def drawn_album(albums: Sequence[Row], today: date) -> Row | None:
     return random.Random(f"quest-album:{today}").choice(pool) if pool else None
 
 
-def album_progress(album: Row, heard: Mapping[str, int], user_ids: Sequence[str]) -> QuestProgress:
+def album_progress(
+    album: AlbumCard, heard: Mapping[str, int], user_ids: Sequence[str]
+) -> QuestProgress:
     need = max(1, math.ceil(album["ntracks"] * QUEST_ALBUM_SHARE))
     progress = {user_id: min(heard.get(user_id, 0), need) for user_id in user_ids}
-    parts: list[Row] = [
+    parts: list[QuestPart] = [
         {"user": user_id, "progress": done, "goal": need} for user_id, done in progress.items()
     ]
     return QuestProgress(
@@ -254,7 +309,7 @@ def together_progress(seconds: float) -> int:
     return min(TOGETHER_QUEST_MINUTES, int(seconds // 60))
 
 
-def quest_view(kind: str, progress: QuestProgress, picked: QuestPick | None) -> Row:
+def quest_view(kind: str, progress: QuestProgress, picked: QuestPick | None) -> QuestView:
     return {
         "kind": kind,
         "text": progress.text,
@@ -301,7 +356,7 @@ class PetRepository(Protocol):
 
     async def carers_since(self, since: int, user_ids: Sequence[str]) -> int: ...
 
-    async def recent_log(self) -> list[Row]: ...
+    async def recent_log(self) -> list[LogEntry]: ...
 
     async def hungry_pushed_since(self, since: int) -> bool: ...
 

@@ -1,6 +1,7 @@
 from collections.abc import Sequence
+from typing import cast
 
-from muse.pet.domain import CARE_LOG, Pet, Row
+from muse.pet.domain import CARE_LOG, LogEntry, Pet
 from muse.shared.db import UnitOfWork
 
 CARE_MARKS = ",".join("?" * len(CARE_LOG))
@@ -87,8 +88,8 @@ class SqlPets:
     async def carers_since(self, since: int, user_ids: Sequence[str]) -> int:
         return await self.uow.value(CARERS, (since, *CARE_LOG, *user_ids))
 
-    async def recent_log(self) -> list[Row]:
-        return await self.uow.rows(RECENT)
+    async def recent_log(self) -> list[LogEntry]:
+        return cast("list[LogEntry]", await self.uow.rows(RECENT))
 
     async def hungry_pushed_since(self, since: int) -> bool:
         return await self.uow.row(HUNGRY_PUSHED, (since,)) is not None

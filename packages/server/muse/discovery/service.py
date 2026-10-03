@@ -2,11 +2,10 @@ import random
 from collections.abc import Awaitable, Callable
 from datetime import date
 from functools import partial
-from typing import Any
 
 import anyio
 
-from muse.catalog.domain import NO_SUCH_GENRE, NO_TRACK
+from muse.catalog.domain import NO_SUCH_GENRE, NO_TRACK, Track
 from muse.catalog.service import Catalog
 from muse.discovery.domain import (
     DAY_MS,
@@ -15,9 +14,9 @@ from muse.discovery.domain import (
     RADIO_RECENT_MS,
     GenreTracks,
     ListeningHistory,
+    Mix,
     RadioModel,
     RadioTaste,
-    Track,
     build_radio_model,
     draw_mix,
     draw_radio,
@@ -95,17 +94,17 @@ class Mixes:
         self.cache = cache
         self.clock = clock
 
-    async def mix(self, user_id: str, genre: str) -> dict[str, Any]:
+    async def mix(self, user_id: str, genre: str) -> Mix:
         day = self.clock.today()
         compose = partial(self._compose, user_id, genre, day)
         return await self.cache.get_or_compute(mix_key(user_id, genre, day), MIX_TTL_S, compose)
 
-    async def genre_mix(self, user_id: str, genre: str) -> dict[str, Any]:
+    async def genre_mix(self, user_id: str, genre: str) -> Mix:
         if genre not in await self.catalog.genre_counts():
             raise DomainError(NO_SUCH_GENRE)
         return await self.mix(user_id, genre)
 
-    async def _compose(self, user_id: str, genre: str, day: date) -> dict[str, Any]:
+    async def _compose(self, user_id: str, genre: str, day: date) -> Mix:
         candidates = await self.genre_tracks.by_id(genre)
         liked = await self.history.liked(user_id)
         since = self.clock.now_ms() - MIX_PLAYED_DAYS * DAY_MS

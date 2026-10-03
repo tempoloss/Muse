@@ -1,5 +1,3 @@
-from typing import Any
-
 from dishka.integrations.litestar import FromDishka, inject
 from litestar import Request, Response, Router, get
 from litestar.params import FromPath, FromQuery
@@ -12,6 +10,16 @@ from muse.catalog.domain import (
     NO_SUCH_ARTIST,
     NO_SUCH_GENRE,
     NO_TRACK,
+    AlbumCard,
+    AlbumPage,
+    ArtistCount,
+    ArtistPage,
+    GenreCount,
+    GenrePage,
+    PlaylistCard,
+    PlaylistPage,
+    SearchResult,
+    Track,
 )
 from muse.catalog.service import Catalog
 from muse.shared.errors import domain_errors
@@ -30,61 +38,61 @@ MP3 = "audio/mpeg"
 
 @get("/genres")
 @inject
-async def genres(catalog: FromDishka[Catalog]) -> list[dict[str, Any]]:
+async def genres(catalog: FromDishka[Catalog]) -> list[GenreCount]:
     return await catalog.genres()
 
 
 @get("/artists")
 @inject
-async def artists(catalog: FromDishka[Catalog], genre: FromQuery[str] = "") -> list[dict[str, Any]]:
+async def artists(catalog: FromDishka[Catalog], genre: FromQuery[str] = "") -> list[ArtistCount]:
     return await catalog.artists(genre)
 
 
 @get("/artist/{name:str}")
 @inject
-async def artist(name: FromPath[str], catalog: FromDishka[Catalog]) -> dict[str, Any]:
+async def artist(name: FromPath[str], catalog: FromDishka[Catalog]) -> ArtistPage:
     return await catalog.artist(name)
 
 
 @get("/albums")
 @inject
-async def albums(catalog: FromDishka[Catalog], genre: FromQuery[str] = "") -> list[dict[str, Any]]:
+async def albums(catalog: FromDishka[Catalog], genre: FromQuery[str] = "") -> list[AlbumCard]:
     return await catalog.albums(genre)
 
 
 @get("/album/{aid:int}")
 @inject
-async def album(aid: FromPath[int], catalog: FromDishka[Catalog]) -> dict[str, Any]:
+async def album(aid: FromPath[int], catalog: FromDishka[Catalog]) -> AlbumPage:
     return await catalog.album(aid)
 
 
 @get("/search")
 @inject
-async def search(catalog: FromDishka[Catalog], q: FromQuery[str] = "") -> dict[str, Any]:
+async def search(catalog: FromDishka[Catalog], q: FromQuery[str] = "") -> SearchResult:
     return await catalog.search(q)
 
 
 @get("/track/{tid:int}")
 @inject
-async def track(tid: FromPath[int], catalog: FromDishka[Catalog]) -> dict[str, Any]:
+async def track(tid: FromPath[int], catalog: FromDishka[Catalog]) -> Track:
     return await catalog.track(tid)
 
 
 @get("/genre/{genre:str}")
 @inject
-async def genre(genre: FromPath[str], catalog: FromDishka[Catalog]) -> dict[str, Any]:
+async def genre(genre: FromPath[str], catalog: FromDishka[Catalog]) -> GenrePage:
     return await catalog.genre(genre)
 
 
 @get("/playlists")
 @inject
-async def playlists(catalog: FromDishka[Catalog]) -> list[dict[str, Any]]:
+async def playlists(catalog: FromDishka[Catalog]) -> list[PlaylistCard]:
     return await catalog.playlists()
 
 
 @get("/playlist/{name:str}")
 @inject
-async def playlist(name: FromPath[str], catalog: FromDishka[Catalog]) -> dict[str, Any]:
+async def playlist(name: FromPath[str], catalog: FromDishka[Catalog]) -> PlaylistPage:
     return await catalog.playlist(name)
 
 

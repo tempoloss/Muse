@@ -4,8 +4,10 @@ from typing import Any
 
 import pytest
 
+from muse.catalog.domain import LibraryTrack
 from muse.daily.domain import (
     DailyDraft,
+    DailyRecord,
     Listening,
     daily_build,
     daily_pool,
@@ -14,7 +16,7 @@ from muse.daily.domain import (
     reply_playlists,
     shown_order,
 )
-from muse.discovery.domain import RadioModel, Track, build_radio_model
+from muse.discovery.domain import RadioModel, build_radio_model
 from muse.identity.domain import User
 
 DAY = date(2026, 1, 15)
@@ -44,7 +46,7 @@ USERS = (
 NOTHING = Listening({"alice": [], "bob": []}, {"alice": {}, "bob": {}}, set())
 
 
-def track(track_id: int, artist: str, genre: str | None = "Rap") -> Track:
+def track(track_id: int, artist: str, genre: str | None = "Rap") -> LibraryTrack:
     return {
         "id": track_id,
         "num": 1,
@@ -235,12 +237,21 @@ def test_replies_are_read_from_their_outermost_json_object() -> None:
 
 
 def test_a_day_shows_mine_then_ours_then_my_partners() -> None:
+    def record(owner: str, slot: int) -> DailyRecord:
+        return {
+            "id": slot,
+            "day": "2026-01-15",
+            "slot": slot,
+            "for_user": owner,
+            "title": f"T{slot}",
+            "blurb": "",
+            "tracks": [],
+            "model": "m",
+            "created_at": 0,
+        }
+
     rows = [
-        {"for_user": "bob", "slot": 0},
-        {"for_user": "both", "slot": 1},
-        {"for_user": "alice", "slot": 2},
-        {"for_user": "bob", "slot": 3},
-        {"for_user": "both", "slot": 4},
+        record(owner, slot) for slot, owner in enumerate(("bob", "both", "alice", "bob", "both"))
     ]
 
     def order(user_id: str) -> list[tuple[str, int]]:

@@ -1,6 +1,6 @@
 from collections.abc import Awaitable, Callable, Mapping
-from typing import Any
 
+from muse.catalog.domain import Track
 from muse.catalog.service import Catalog
 from muse.daily.service import DailyPlaylists
 from muse.discovery.service import Mixes
@@ -12,7 +12,10 @@ from muse.home.domain import (
     PARTNER_RECENT_LIMIT,
     RECENT_LIMIT,
     TOP_ARTISTS_WINDOW_MS,
+    ContinueCard,
     HomeQueries,
+    HomeView,
+    MixCard,
     forgotten_albums,
     home_key,
     mix_genres,
@@ -24,8 +27,7 @@ from muse.shared.clock import Clock
 from muse.shared.db import UnitOfWork
 from muse.together.service import Ours
 
-type Card = dict[str, Any]
-type Builder = Callable[[str, str, Mapping[str, int]], Awaitable[Card | None]]
+type Builder = Callable[[str, str, Mapping[str, int]], Awaitable[ContinueCard | None]]
 
 
 class ContinueCards:
@@ -43,12 +45,16 @@ class ContinueCards:
             "daily": self._daily,
         }
 
-    async def card(self, user_id: str, source: str, genres: Mapping[str, int]) -> Card | None:
+    async def card(
+        self, user_id: str, source: str, genres: Mapping[str, int]
+    ) -> ContinueCard | None:
         kind, _, argument = source.partition(":")
         builder = self.builders.get(kind)
         return await builder(user_id, argument, genres) if builder else None
 
-    async def _album(self, user_id: str, argument: str, genres: Mapping[str, int]) -> Card | None:
+    async def _album(
+        self, user_id: str, argument: str, genres: Mapping[str, int]
+    ) -> ContinueCard | None:
         head = await self.catalog.album_head(int(argument)) if argument.isdigit() else None
         if head is None:
             return None
@@ -62,7 +68,7 @@ class ContinueCards:
 
     async def _playlist(
         self, user_id: str, argument: str, genres: Mapping[str, int]
-    ) -> Card | None:
+    ) -> ContinueCard | None:
         if not await self.catalog.has_playlist(argument):
             return None
         playlist = await self.catalog.playlist(argument)
@@ -74,7 +80,9 @@ class ContinueCards:
             "albums": await self.catalog.cover_ids(playlist["tracks"]),
         }
 
-    async def _mix(self, user_id: str, argument: str, genres: Mapping[str, int]) -> Card | None:
+    async def _mix(
+        self, user_id: str, argument: str, genres: Mapping[str, int]
+    ) -> ContinueCard | None:
         if argument not in genres:
             return None
         mix = await self.mixes.mix(user_id, argument)
@@ -86,7 +94,9 @@ class ContinueCards:
             "albums": await self.catalog.cover_ids(mix["tracks"]),
         }
 
-    async def _genre(self, user_id: str, argument: str, genres: Mapping[str, int]) -> Card | None:
+    async def _genre(
+        self, user_id: str, argument: str, genres: Mapping[str, int]
+    ) -> ContinueCard | None:
         if argument not in genres:
             return None
         page = await self.catalog.genre(argument)
@@ -98,7 +108,9 @@ class ContinueCards:
             "albums": page["albums"],
         }
 
-    async def _ours(self, user_id: str, argument: str, genres: Mapping[str, int]) -> Card | None:
+    async def _ours(
+        self, user_id: str, argument: str, genres: Mapping[str, int]
+    ) -> ContinueCard | None:
         ours = await self.ours.listing()
         if not ours["tracks"]:
             return None
@@ -109,7 +121,9 @@ class ContinueCards:
             "albums": ours["albums"],
         }
 
-    async def _daily(self, user_id: str, argument: str, genres: Mapping[str, int]) -> Card | None:
+    async def _daily(
+        self, user_id: str, argument: str, genres: Mapping[str, int]
+    ) -> ContinueCard | None:
         daily = await self.daily.playlist(int(argument)) if argument.isdigit() else None
         if daily is None:
             return None
@@ -143,11 +157,11 @@ class HomeFeed:
         self.users = users
         self.clock = clock
 
-    async def home(self, user_id: str) -> Card:
+    async def home(self, user_id: str) -> HomeView:
         key = home_key(user_id, self.clock.today())
         return await self.cache.get_or_compute(key, HOME_TTL_S, lambda: self._compose(user_id))
 
-    async def _compose(self, user_id: str) -> Card:
+    async def _compose(self, user_id: str) -> HomeView:
         partner_id = self.users.partner_id(user_id)
         genres = await self.catalog.genre_counts()
         now = self.clock.now_ms()
@@ -166,12 +180,12 @@ class HomeFeed:
             "partner_recent": await self._recent(partner_id, PARTNER_RECENT_LIMIT),
         }
 
-    async def _recent(self, user_id: str, limit: int) -> list[Card]:
+    async def _recent(self, user_id: str, limit: int) -> list[Track]:
         ids = await self.queries.recent_track_ids(user_id, limit)
         return await self.catalog.tracks_in_order(ids)
 
-    async def _continue(self, user_id: str, genres: Mapping[str, int]) -> list[Card]:
-        out: list[Card] = []
+    async def _continue(self, user_id: str, genres: Mapping[str, int]) -> list[ContinueCard]:
+        out: list[ContinueCard] = []
         for source in await self.queries.recent_sources(user_id):
             card = await self.cards.card(user_id, source, genres)
             if card:
@@ -180,9 +194,9 @@ class HomeFeed:
                 break
         return out
 
-    async def _mixes(self, user_id: str, genres: Mapping[str, int], now: int) -> list[Card]:
+    async def _mixes(self, user_id: str, genres: Mapping[str, int], now: int) -> list[MixCard]:
         ranked = await self.queries.genre_ranking(user_id, now - MIX_WINDOW_MS)
-        cards = []
+        cards: list[MixCard] = []
         for genre in mix_genres(ranked, list(genres)):
             mix = await self.mixes.mix(user_id, genre)
             cards.append(

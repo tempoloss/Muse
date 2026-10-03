@@ -1,7 +1,9 @@
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, NotRequired, Protocol, TypedDict
 
+from muse.catalog.domain import Track
 from muse.shared.errors import DomainError
 from muse.shared.events import Event
 
@@ -18,8 +20,68 @@ PARTNER_FOLLOWS = "partner follows you"
 BAD_TEXT = "bad text"
 NO_LETTER = "no letter"
 
-type Track = dict[str, Any]
-type Note = dict[str, Any]
+
+class PartnerNow(TypedDict):
+    track: Track
+    position: float
+    playing: bool
+    following: bool
+
+
+class Mirrored(TypedDict):
+    track: Track
+    position: float
+    playing: bool
+    at: int
+
+
+class LiveView(TypedDict):
+    partner: PartnerNow | None
+    together: bool
+    unread: int
+
+
+class FollowView(TypedDict):
+    partner: Mirrored | None
+
+
+LetterView = TypedDict(
+    "LetterView",
+    {
+        "id": int,
+        "from": str,
+        "to": str,
+        "track": Track | None,
+        "text": str,
+        "created_at": int,
+        "read_at": int | None,
+    },
+)
+
+
+class LetterList(TypedDict):
+    received: list[LetterView]
+    sent: list[LetterView]
+
+
+class OursTrack(Track):
+    added_by: str
+    added_at: int
+
+
+class OursView(TypedDict):
+    tracks: list[OursTrack]
+    albums: list[int]
+
+
+class Note(TypedDict):
+    kind: str
+    text: str
+    date: NotRequired[str]
+
+
+class NotesView(TypedDict):
+    notes: list[Note]
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,10 +137,11 @@ def shared_seconds(previous: Beat | None, current: Beat, partner: Beat | None) -
 
 
 def clamped(position: float, track: Track) -> float:
-    return min(position, track["dur"]) if track["dur"] else position
+    dur = track["dur"]
+    return min(position, dur) if dur else position
 
 
-def live_partner(beat: Beat, track: Track, now: int, following: bool) -> dict[str, Any]:
+def live_partner(beat: Beat, track: Track, now: int, following: bool) -> PartnerNow:
     position = beat.position + (now - beat.at) / 1000
     return {
         "track": track,
@@ -94,7 +157,7 @@ def mirrored_track_id(beat: Beat | None, now: int) -> int | None:
     return beat.track_id
 
 
-def mirror(beat: Beat, track: Track, now: int) -> dict[str, Any]:
+def mirror(beat: Beat, track: Track, now: int) -> Mirrored:
     position = beat.position + ((now - beat.at) / 1000 if beat.playing else 0)
     return {
         "track": track,
@@ -114,7 +177,7 @@ class Letter:
     created_at: int
     read_at: int | None
 
-    def view(self, tracks: dict[int, Track]) -> dict[str, Any]:
+    def view(self, tracks: dict[int, Track]) -> LetterView:
         return {
             "id": self.id,
             "from": self.sender,
@@ -151,7 +214,7 @@ def valid_note(note: object) -> bool:
     )
 
 
-def note_view(note: Note) -> Note:
+def note_view(note: Mapping[str, Any]) -> Note:
     return {
         "kind": note["kind"],
         "text": note["text"].strip(),

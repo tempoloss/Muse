@@ -2,7 +2,6 @@ import math
 import secrets
 from dataclasses import dataclass
 from functools import cache
-from typing import Any
 
 import anyio
 import bcrypt
@@ -12,6 +11,7 @@ from muse.identity.domain import (
     PASSWORD_MAX_BYTES,
     UNAUTHORIZED,
     AttemptLimiter,
+    Me,
     PasswordStore,
     SessionStore,
     TooManyAttemptsError,
@@ -46,7 +46,7 @@ def hash_password(password: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class LoginResult:
-    me: dict[str, Any]
+    me: Me
     token: str
 
 

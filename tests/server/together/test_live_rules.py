@@ -1,5 +1,6 @@
 import pytest
 
+from muse.catalog.domain import Track
 from muse.identity.domain import User, Users
 from muse.together.domain import (
     Beat,
@@ -12,7 +13,15 @@ from muse.together.domain import (
 from muse.together.infra.live import LiveRegistry
 
 T0 = 1_800_000_000_000
-TRACK = {"id": 7, "num": 1, "title": "Song", "dur": 200, "album_id": 3, "album": "A", "artist": "B"}
+TRACK: Track = {
+    "id": 7,
+    "num": 1,
+    "title": "Song",
+    "dur": 200,
+    "album_id": 3,
+    "album": "A",
+    "artist": "B",
+}
 
 
 def playing(at: int, track_id: int | None = 7, position: float = 30.0) -> Beat:
@@ -73,7 +82,7 @@ def test_the_partner_position_runs_on_from_the_beat_and_stops_at_the_track_end()
         "following": True,
     }
     assert live_partner(playing(T0), TRACK, T0 + 400_000, following=False)["position"] == 200
-    untimed = {**TRACK, "dur": None}
+    untimed: Track = {**TRACK, "dur": None}
     assert live_partner(playing(T0), untimed, T0 + 400_000, following=False)["position"] == 430
 
 

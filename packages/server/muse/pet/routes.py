@@ -6,7 +6,16 @@ from litestar.params import FromPath
 
 from muse.catalog.domain import NO_ALBUM
 from muse.identity.domain import User
-from muse.pet.domain import ASLEEP, BAD_NAME, DONE, HEALTHY, NO_SUCH_ACTION, TIRED, Row
+from muse.pet.domain import (
+    ASLEEP,
+    BAD_NAME,
+    DONE,
+    HEALTHY,
+    NO_SUCH_ACTION,
+    TIRED,
+    CaredView,
+    PetView,
+)
 from muse.pet.schemas import PetNameBody, QuestAlbumBody
 from muse.pet.service import PetCare, QuestAlbums
 from muse.shared.errors import domain_errors
@@ -24,7 +33,7 @@ ERRORS = {
 
 @get("/pet")
 @inject
-async def pet(request: Request[User, str, Any], care: FromDishka[PetCare]) -> Row:
+async def pet(request: Request[User, str, Any], care: FromDishka[PetCare]) -> PetView:
     return await care.show(request.user.id)
 
 
@@ -32,7 +41,7 @@ async def pet(request: Request[User, str, Any], care: FromDishka[PetCare]) -> Ro
 @inject
 async def quest_album(
     data: QuestAlbumBody, request: Request[User, str, Any], albums: FromDishka[QuestAlbums]
-) -> Row:
+) -> PetView:
     return await albums.choose(request.user.id, data.album_id)
 
 
@@ -40,7 +49,7 @@ async def quest_album(
 @inject
 async def rename(
     data: PetNameBody, request: Request[User, str, Any], care: FromDishka[PetCare]
-) -> Row:
+) -> PetView:
     return await care.rename(request.user.id, data.name)
 
 
@@ -48,7 +57,7 @@ async def rename(
 @inject
 async def act(
     action: FromPath[str], request: Request[User, str, Any], care: FromDishka[PetCare]
-) -> Row:
+) -> CaredView:
     return await care.act(request.user.id, action)
 
 

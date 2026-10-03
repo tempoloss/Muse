@@ -1,6 +1,25 @@
 from collections.abc import Sequence
+from typing import cast
 
-from muse.catalog.domain import ALBUM_NAME, ARTIST, PLAYABLE, TRACK_COLUMNS, Row
+from muse.catalog.domain import (
+    ALBUM_NAME,
+    ARTIST,
+    PLAYABLE,
+    TRACK_COLUMNS,
+    AlbumCard,
+    AlbumHead,
+    AlbumRecord,
+    AlbumTrack,
+    ArtistAlbum,
+    ArtistCount,
+    GenreCount,
+    LibraryTrack,
+    SearchResult,
+    StoredTrack,
+    Track,
+    TrackDuration,
+    TrackPath,
+)
 from muse.shared.db import CatalogDb
 
 GENRES = (
@@ -53,59 +72,65 @@ class SqlCatalog:
     def __init__(self, db: CatalogDb) -> None:
         self.db = db
 
-    async def genres(self) -> list[Row]:
-        return await self.db.rows(GENRES)
+    async def genres(self) -> list[GenreCount]:
+        return cast("list[GenreCount]", await self.db.rows(GENRES))
 
-    async def artists(self, genre: str) -> list[Row]:
+    async def artists(self, genre: str) -> list[ArtistCount]:
         sql = (
             ARTISTS
             + ("AND al.genre=? " if genre else "")
             + f"GROUP BY {ARTIST} ORDER BY tracks DESC"
         )
-        return await self.db.rows(sql, (genre,) if genre else ())
+        return cast("list[ArtistCount]", await self.db.rows(sql, (genre,) if genre else ()))
 
-    async def artist_albums(self, name: str) -> list[Row]:
-        return await self.db.rows(ARTIST_ALBUMS, (name,))
+    async def artist_albums(self, name: str) -> list[ArtistAlbum]:
+        return cast("list[ArtistAlbum]", await self.db.rows(ARTIST_ALBUMS, (name,)))
 
-    async def albums(self, genre: str) -> list[Row]:
+    async def albums(self, genre: str) -> list[AlbumCard]:
         sql = ALBUMS + ("AND al.genre=? " if genre else "")
         sql += f"GROUP BY al.id ORDER BY {ARTIST}, al.year, al.name"
-        return await self.db.rows(sql, (genre,) if genre else ())
+        return cast("list[AlbumCard]", await self.db.rows(sql, (genre,) if genre else ()))
 
-    async def album(self, album_id: int) -> Row | None:
-        return await self.db.row(ALBUM, (album_id,))
+    async def album(self, album_id: int) -> AlbumRecord | None:
+        return cast("AlbumRecord | None", await self.db.row(ALBUM, (album_id,)))
 
-    async def album_tracks(self, album_id: int) -> list[Row]:
-        return await self.db.rows(ALBUM_TRACKS, (album_id,))
+    async def album_tracks(self, album_id: int) -> list[AlbumTrack]:
+        return cast("list[AlbumTrack]", await self.db.rows(ALBUM_TRACKS, (album_id,)))
 
-    async def album_head(self, album_id: int) -> Row | None:
-        return await self.db.row(ALBUM_HEAD, (album_id,))
+    async def album_head(self, album_id: int) -> AlbumHead | None:
+        return cast("AlbumHead | None", await self.db.row(ALBUM_HEAD, (album_id,)))
 
-    async def search(self, pattern: str) -> Row:
-        return {
-            "artists": await self.db.rows(SEARCH_ARTISTS, (pattern, pattern)),
-            "albums": await self.db.rows(SEARCH_ALBUMS, (pattern,)),
-            "tracks": await self.db.rows(SEARCH_TRACKS, (pattern,)),
-        }
+    async def search(self, pattern: str) -> SearchResult:
+        return cast(
+            "SearchResult",
+            {
+                "artists": await self.db.rows(SEARCH_ARTISTS, (pattern, pattern)),
+                "albums": await self.db.rows(SEARCH_ALBUMS, (pattern,)),
+                "tracks": await self.db.rows(SEARCH_TRACKS, (pattern,)),
+            },
+        )
 
-    async def track(self, track_id: int) -> Row | None:
-        return await self.db.row(TRACK, (track_id,))
+    async def track(self, track_id: int) -> Track | None:
+        return cast("Track | None", await self.db.row(TRACK, (track_id,)))
 
-    async def genre_tracks(self, genre: str) -> list[Row]:
-        return await self.db.rows(GENRE_TRACKS, (genre,))
+    async def genre_tracks(self, genre: str) -> list[Track]:
+        return cast("list[Track]", await self.db.rows(GENRE_TRACKS, (genre,)))
 
-    async def track_rows(self, ids: Sequence[int]) -> list[Row]:
+    async def track_rows(self, ids: Sequence[int]) -> list[Track]:
         marks = ",".join("?" * len(ids))
-        return await self.db.rows(f"SELECT {TRACK_COLUMNS} {PLAYABLE}AND t.id IN ({marks})", ids)
+        sql = f"SELECT {TRACK_COLUMNS} {PLAYABLE}AND t.id IN ({marks})"
+        return cast("list[Track]", await self.db.rows(sql, ids))
 
-    async def duration(self, track_id: int) -> Row | None:
-        return await self.db.row(DURATION, (track_id,))
+    async def duration(self, track_id: int) -> TrackDuration | None:
+        return cast("TrackDuration | None", await self.db.row(DURATION, (track_id,)))
 
-    async def library_tracks(self) -> list[Row]:
-        return await self.db.rows(LIBRARY_TRACKS)
+    async def library_tracks(self) -> list[LibraryTrack]:
+        return cast("list[LibraryTrack]", await self.db.rows(LIBRARY_TRACKS))
 
-    async def playable_paths(self) -> list[Row]:
-        return await self.db.rows(f"SELECT {TRACK_COLUMNS}, t.path {PLAYABLE}")
+    async def playable_paths(self) -> list[StoredTrack]:
+        sql = f"SELECT {TRACK_COLUMNS}, t.path {PLAYABLE}"
+        return cast("list[StoredTrack]", await self.db.rows(sql))
 
-    async def track_path(self, track_id: int) -> Row | None:
-        return await self.db.row("SELECT path FROM tracks WHERE id=? AND status='ok'", (track_id,))
+    async def track_path(self, track_id: int) -> TrackPath | None:
+        sql = "SELECT path FROM tracks WHERE id=? AND status='ok'"
+        return cast("TrackPath | None", await self.db.row(sql, (track_id,)))

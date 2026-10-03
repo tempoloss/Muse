@@ -3,6 +3,7 @@ from datetime import date
 
 import pytest
 
+from muse.catalog.domain import AlbumCard
 from muse.pet.domain import (
     PET_SLEEP_MS,
     Pet,
@@ -40,8 +41,15 @@ def pet(**fields: object) -> Pet:
     return replace(base, **fields)
 
 
-def album(album_id: int, ntracks: int) -> dict[str, object]:
-    return {"id": album_id, "name": f"A{album_id}", "artist": "X", "ntracks": ntracks, "year": None}
+def album(album_id: int, ntracks: int) -> AlbumCard:
+    return {
+        "id": album_id,
+        "name": f"A{album_id}",
+        "year": None,
+        "genre": None,
+        "artist": "X",
+        "ntracks": ntracks,
+    }
 
 
 def test_a_neglected_pet_starves_into_sickness() -> None:

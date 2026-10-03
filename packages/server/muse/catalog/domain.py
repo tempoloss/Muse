@@ -2,9 +2,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Any, Protocol
-
-type Row = dict[str, Any]
+from typing import Protocol, TypedDict
 
 SINGLES = "Одиночные и синглы"
 ARTIST = "COALESCE(ar.canonical, t.artist)"
@@ -18,7 +16,6 @@ ALBUM_NAME = (
     + " THEN 'Синглы · ' || al.artist ELSE al.name END"
 )
 TRACK_COLUMNS = f"t.id, t.num, t.title, t.dur, t.album_id, {ALBUM_NAME} album, {ARTIST} artist"
-TRACK_FIELDS = ("id", "num", "title", "dur", "album_id", "album", "artist")
 CATALOG_TTL_S = 86400
 SEARCH_MIN_CHARS = 2
 COVER_MOSAIC = 4
@@ -40,7 +37,144 @@ def search_pattern(query: str) -> str:
     return f"%{query.casefold()}%"
 
 
-def first_albums(tracks: Iterable[Mapping[str, Any]], covered: set[int], limit: int) -> list[int]:
+class GenreCount(TypedDict):
+    genre: str | None
+    artists: int
+    tracks: int
+
+
+class ArtistCount(TypedDict):
+    name: str
+    albums: int
+    tracks: int
+
+
+class ArtistAlbum(TypedDict):
+    id: int
+    name: str
+    year: str | None
+    genre: str | None
+    ntracks: int
+
+
+class AlbumMatch(TypedDict):
+    id: int
+    name: str
+    year: str | None
+    genre: str | None
+    artist: str
+
+
+class AlbumCard(AlbumMatch):
+    ntracks: int
+
+
+class AlbumRecord(TypedDict):
+    id: int
+    name: str
+    artist: str
+    who: str
+    year: str | None
+    genre: str | None
+
+
+class AlbumHead(TypedDict):
+    id: int
+    name: str
+    artist: str
+
+
+class AlbumTrack(TypedDict):
+    id: int
+    num: int | None
+    title: str
+    dur: int | None
+
+
+class TrackMatch(TypedDict):
+    id: int
+    title: str
+    album: str
+    album_id: int
+    artist: str
+    dur: int | None
+
+
+class Track(TrackMatch):
+    num: int | None
+
+
+class LibraryTrack(Track):
+    genre: str | None
+
+
+class StoredTrack(Track):
+    path: str | None
+
+
+class TrackPath(TypedDict):
+    path: str | None
+
+
+class TrackDuration(TypedDict):
+    dur: int | None
+
+
+class SearchResult(TypedDict):
+    artists: list[ArtistCount]
+    albums: list[AlbumMatch]
+    tracks: list[TrackMatch]
+
+
+class ArtistPage(TypedDict):
+    name: str
+    genre: str | None
+    albums: list[ArtistAlbum]
+
+
+class AlbumPage(TypedDict):
+    id: int
+    name: str
+    year: str | None
+    genre: str | None
+    artist: str
+    cover: str
+    tracks: list[AlbumTrack]
+
+
+class GenrePage(TypedDict):
+    genre: str
+    title: str
+    tracks: list[Track]
+    albums: list[int]
+
+
+class PlaylistCard(TypedDict):
+    name: str
+    tracks: int
+    dur: int
+    albums: list[int]
+
+
+class PlaylistPage(TypedDict):
+    name: str
+    tracks: list[Track]
+    albums: list[int]
+
+
+def track_of(row: Track) -> Track:
+    return {
+        "id": row["id"],
+        "num": row["num"],
+        "title": row["title"],
+        "dur": row["dur"],
+        "album_id": row["album_id"],
+        "album": row["album"],
+        "artist": row["artist"],
+    }
+
+
+def first_albums(tracks: Iterable[TrackMatch], covered: set[int], limit: int) -> list[int]:
     out: list[int] = []
     for track in tracks:
         album_id = track["album_id"]
@@ -83,45 +217,45 @@ def playlist_key(line: str) -> str | None:
     return DEVICE_PREFIX.sub("", entry.replace("\\", "/")).casefold()
 
 
-def playlist_tracks(lines: Iterable[str], by_key: Mapping[str, Row]) -> list[Row]:
-    out = []
+def playlist_tracks(lines: Iterable[str], by_key: Mapping[str, StoredTrack]) -> list[Track]:
+    out: list[Track] = []
     for line in lines:
         key = playlist_key(line)
         if key is not None and (row := by_key.get(key)):
-            out.append({field: row[field] for field in TRACK_FIELDS})
+            out.append(track_of(row))
     return out
 
 
 class CatalogQueries(Protocol):
-    async def genres(self) -> list[Row]: ...
+    async def genres(self) -> list[GenreCount]: ...
 
-    async def artists(self, genre: str) -> list[Row]: ...
+    async def artists(self, genre: str) -> list[ArtistCount]: ...
 
-    async def artist_albums(self, name: str) -> list[Row]: ...
+    async def artist_albums(self, name: str) -> list[ArtistAlbum]: ...
 
-    async def albums(self, genre: str) -> list[Row]: ...
+    async def albums(self, genre: str) -> list[AlbumCard]: ...
 
-    async def album(self, album_id: int) -> Row | None: ...
+    async def album(self, album_id: int) -> AlbumRecord | None: ...
 
-    async def album_tracks(self, album_id: int) -> list[Row]: ...
+    async def album_tracks(self, album_id: int) -> list[AlbumTrack]: ...
 
-    async def album_head(self, album_id: int) -> Row | None: ...
+    async def album_head(self, album_id: int) -> AlbumHead | None: ...
 
-    async def search(self, pattern: str) -> Row: ...
+    async def search(self, pattern: str) -> SearchResult: ...
 
-    async def track(self, track_id: int) -> Row | None: ...
+    async def track(self, track_id: int) -> Track | None: ...
 
-    async def genre_tracks(self, genre: str) -> list[Row]: ...
+    async def genre_tracks(self, genre: str) -> list[Track]: ...
 
-    async def track_rows(self, ids: Sequence[int]) -> list[Row]: ...
+    async def track_rows(self, ids: Sequence[int]) -> list[Track]: ...
 
-    async def duration(self, track_id: int) -> Row | None: ...
+    async def duration(self, track_id: int) -> TrackDuration | None: ...
 
-    async def library_tracks(self) -> list[Row]: ...
+    async def library_tracks(self) -> list[LibraryTrack]: ...
 
-    async def playable_paths(self) -> list[Row]: ...
+    async def playable_paths(self) -> list[StoredTrack]: ...
 
-    async def track_path(self, track_id: int) -> Row | None: ...
+    async def track_path(self, track_id: int) -> TrackPath | None: ...
 
 
 class LibraryState(Protocol):

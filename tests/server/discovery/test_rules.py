@@ -4,10 +4,10 @@ from collections import Counter
 from datetime import date, timedelta
 from itertools import pairwise
 
+from muse.catalog.domain import LibraryTrack
 from muse.discovery.domain import (
     MIX_SIZE,
     RadioTaste,
-    Track,
     build_radio_model,
     draw_mix,
     draw_radio,
@@ -18,7 +18,7 @@ from muse.discovery.domain import (
 NOBODY = RadioTaste(set(), set())
 
 
-def track(track_id: int, artist: str, genre: str | None = "Rap") -> Track:
+def track(track_id: int, artist: str, genre: str | None = "Rap") -> LibraryTrack:
     return {
         "id": track_id,
         "num": 1,
@@ -31,7 +31,7 @@ def track(track_id: int, artist: str, genre: str | None = "Rap") -> Track:
     }
 
 
-def library() -> list[Track]:
+def library() -> list[LibraryTrack]:
     tracks = [track(index, "Seed") for index in range(1, 7)]
     tracks += [track(index, "Near", "Indie") for index in range(11, 15)]
     for number in range(30):

@@ -1,9 +1,10 @@
 import json
 from collections.abc import Sequence
+from typing import cast
 
 from muse.activity.domain import COUNTED, PLAYS_LIB
-from muse.daily.domain import DailyDraft, Row
-from muse.shared.db import UnitOfWork
+from muse.daily.domain import DailyDraft, DailyRecord
+from muse.shared.db import Row, UnitOfWork
 
 EXISTS = "SELECT 1 FROM daily WHERE day=? LIMIT 1"
 PAST_TITLES = "SELECT title FROM daily WHERE day<? ORDER BY day DESC, slot LIMIT ?"
@@ -23,8 +24,8 @@ PLAY_COUNTS = (
 HEARD = "SELECT DISTINCT track_id FROM plays"
 
 
-def decoded(row: Row) -> Row:
-    return {**row, "tracks": json.loads(row["tracks"])}
+def decoded(row: Row) -> DailyRecord:
+    return cast("DailyRecord", {**row, "tracks": json.loads(row["tracks"])})
 
 
 class SqlDailyStore:
@@ -43,14 +44,14 @@ class SqlDailyStore:
             values = (draft.owner, draft.title, draft.blurb, json.dumps(draft.tracks))
             await self.uow.execute(INSERT, (day, slot, *values, model, now))
 
-    async def get(self, playlist_id: int) -> Row | None:
+    async def get(self, playlist_id: int) -> DailyRecord | None:
         row = await self.uow.row(BY_ID, (playlist_id,))
         return decoded(row) if row is not None else None
 
     async def latest_day(self, today: str) -> str | None:
         return await self.uow.value(LATEST_DAY, (today,))
 
-    async def of_day(self, day: str) -> list[Row]:
+    async def of_day(self, day: str) -> list[DailyRecord]:
         return [decoded(row) for row in await self.uow.rows(OF_DAY, (day,))]
 
 

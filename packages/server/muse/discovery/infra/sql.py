@@ -1,6 +1,7 @@
+from typing import cast
+
 from muse.activity.domain import COUNTED, PLAYS_LIB
-from muse.catalog.domain import PLAYABLE, TRACK_COLUMNS
-from muse.discovery.domain import Track
+from muse.catalog.domain import PLAYABLE, TRACK_COLUMNS, Track
 from muse.shared.db import CatalogDb, UnitOfWork
 
 PLAYED_SINCE = "SELECT track_id FROM plays WHERE user=? AND started_at>=?"
@@ -33,4 +34,4 @@ class SqlGenreTracks:
         self.db = db
 
     async def by_id(self, genre: str) -> list[Track]:
-        return await self.db.rows(GENRE_TRACKS, (genre,))
+        return cast("list[Track]", await self.db.rows(GENRE_TRACKS, (genre,)))

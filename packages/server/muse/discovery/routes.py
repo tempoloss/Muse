@@ -5,7 +5,7 @@ from litestar import Request, Router, get
 from litestar.params import FromPath, FromQuery, QueryParameter
 
 from muse.catalog.domain import NO_SUCH_GENRE, NO_TRACK
-from muse.discovery.domain import RADIO_MAX, RADIO_MIN, RADIO_SIZE, excluded_ids
+from muse.discovery.domain import RADIO_MAX, RADIO_MIN, RADIO_SIZE, Mix, RadioView, excluded_ids
 from muse.discovery.service import Mixes, Radio
 from muse.identity.domain import User
 from muse.shared.errors import domain_errors
@@ -21,7 +21,7 @@ async def radio(
     service: FromDishka[Radio],
     exclude: FromQuery[str] = "",
     n: Annotated[int, QueryParameter(ge=RADIO_MIN, le=RADIO_MAX)] = RADIO_SIZE,
-) -> dict[str, Any]:
+) -> RadioView:
     tracks = await service.tracks(request.user.id, tid, excluded_ids(exclude), n)
     return {"seed": tid, "tracks": tracks}
 
@@ -30,7 +30,7 @@ async def radio(
 @inject
 async def mix(
     genre: FromPath[str], request: Request[User, str, Any], mixes: FromDishka[Mixes]
-) -> dict[str, Any]:
+) -> Mix:
     return await mixes.genre_mix(request.user.id, genre)
 
 

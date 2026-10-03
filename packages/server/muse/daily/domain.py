@@ -5,13 +5,13 @@ from collections import Counter, defaultdict
 from collections.abc import AsyncIterator, Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Protocol
+from typing import Protocol, TypedDict
 
-from muse.discovery.domain import Links, RadioModel, Track
+from muse.catalog.domain import LibraryTrack, Track
+from muse.discovery.domain import Links, RadioModel
 from muse.identity.domain import User
 
 type Ask = Callable[[str], AsyncIterator[tuple[str, str]]]
-type Row = dict[str, Any]
 
 NO_PLAYLIST = "no playlist"
 BOTH = "both"
@@ -67,12 +67,59 @@ class DailyDraft:
     picked: int
 
 
+class DailyRecord(TypedDict):
+    id: int
+    day: str
+    slot: int
+    for_user: str
+    title: str
+    blurb: str
+    tracks: list[int]
+    model: str
+    created_at: int
+
+
+DailyCard = TypedDict(
+    "DailyCard",
+    {
+        "id": int,
+        "for": str,
+        "title": str,
+        "blurb": str,
+        "tracks": int,
+        "dur": int,
+        "albums": list[int],
+    },
+)
+
+
+class DailyDay(TypedDict):
+    day: str | None
+    playlists: list[DailyCard]
+
+
+DailyPage = TypedDict(
+    "DailyPage",
+    {
+        "id": int,
+        "day": str,
+        "for": str,
+        "title": str,
+        "blurb": str,
+        "tracks": list[Track],
+        "albums": list[int],
+    },
+)
+
+
 def most_played(plays: dict[int, int]) -> list[int]:
     return sorted(plays, key=lambda track_id: -plays[track_id])
 
 
-def favourites(model: RadioModel, users: Sequence[User], listening: Listening) -> dict[int, Track]:
-    pool: dict[int, Track] = {}
+def favourites(
+    model: RadioModel, users: Sequence[User], listening: Listening
+) -> dict[int, LibraryTrack]:
+    pool: dict[int, LibraryTrack] = {}
     for user in users:
         mine = most_played(listening.plays[user.id])[:POOL_PLAYS]
         for track_id in listening.likes[user.id][:POOL_LIKES] + mine:
@@ -81,7 +128,7 @@ def favourites(model: RadioModel, users: Sequence[User], listening: Listening) -
     return pool
 
 
-def nearness(pool: Iterable[Track], links: Links) -> defaultdict[str, float]:
+def nearness(pool: Iterable[LibraryTrack], links: Links) -> defaultdict[str, float]:
     near: defaultdict[str, float] = defaultdict(float)
     for track in pool:
         near[track["artist"]] += 1
@@ -91,10 +138,10 @@ def nearness(pool: Iterable[Track], links: Links) -> defaultdict[str, float]:
 
 
 def fresh_picks(
-    fresh: list[Track], near: defaultdict[str, float], rnd: random.Random
-) -> list[Track]:
+    fresh: list[LibraryTrack], near: defaultdict[str, float], rnd: random.Random
+) -> list[LibraryTrack]:
     per: Counter[str] = Counter()
-    picked: list[Track] = []
+    picked: list[LibraryTrack] = []
     drawn = sorted(fresh, key=lambda track: -(rnd.random() ** (1 / (0.05 + near[track["artist"]]))))
     for track in drawn:
         if per[track["artist"]] < ARTIST_CAP:
@@ -107,7 +154,7 @@ def fresh_picks(
 
 def daily_pool(
     day: date, model: RadioModel, users: Sequence[User], listening: Listening
-) -> list[Track]:
+) -> list[LibraryTrack]:
     rnd = random.Random(f"daily:{day}")
     pool = favourites(model, users, listening)
     near = nearness(pool.values(), model.links)
@@ -140,7 +187,7 @@ def taste_line(user: User, model: RadioModel, listening: Listening) -> str:
 
 
 def pool_row(
-    track: Track, marks: dict[str, str], liked: dict[str, set[int]], listening: Listening
+    track: LibraryTrack, marks: dict[str, str], liked: dict[str, set[int]], listening: Listening
 ) -> str:
     plays = listening.plays
     flags = [f"♥{mark}" for user_id, mark in marks.items() if track["id"] in liked[user_id]]
@@ -165,7 +212,7 @@ def legend(users: Sequence[User], marks: dict[str, str]) -> str:
 
 def daily_prompt(
     day: date,
-    pool: Sequence[Track],
+    pool: Sequence[LibraryTrack],
     model: RadioModel,
     users: Sequence[User],
     listening: Listening,
@@ -284,7 +331,7 @@ def reply_playlists(reply: str) -> object:
     return json.loads(found.group(0)).get("playlists") if found else None
 
 
-def shown_order(rows: Iterable[Row], user_id: str) -> list[Row]:
+def shown_order(rows: Iterable[DailyRecord], user_id: str) -> list[DailyRecord]:
     rank = {user_id: 0, BOTH: 1}
     return sorted(rows, key=lambda row: (rank.get(row["for_user"], 2), row["slot"]))
 
@@ -298,11 +345,11 @@ class DailyStore(Protocol):
         self, day: str, drafts: Sequence[DailyDraft], model: str, now: int
     ) -> None: ...
 
-    async def get(self, playlist_id: int) -> Row | None: ...
+    async def get(self, playlist_id: int) -> DailyRecord | None: ...
 
     async def latest_day(self, today: str) -> str | None: ...
 
-    async def of_day(self, day: str) -> list[Row]: ...
+    async def of_day(self, day: str) -> list[DailyRecord]: ...
 
 
 class TasteSource(Protocol):

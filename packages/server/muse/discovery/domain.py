@@ -3,9 +3,10 @@ import random
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Protocol
+from typing import Protocol, TypedDict
 
-type Track = dict[str, Any]
+from muse.catalog.domain import LibraryTrack, Track, track_of
+
 type Links = dict[str, dict[str, float]]
 
 DAY_MS = 86400 * 1000
@@ -22,10 +23,22 @@ MIX_PLAYED_DAYS = 90
 MIX_TTL_S = 86400
 
 
+class Mix(TypedDict):
+    genre: str
+    title: str
+    tracks: list[Track]
+    albums: list[int]
+
+
+class RadioView(TypedDict):
+    seed: int
+    tracks: list[Track]
+
+
 @dataclass(frozen=True, slots=True)
 class RadioModel:
-    tracks: list[Track]
-    by_id: dict[int, Track]
+    tracks: list[LibraryTrack]
+    by_id: dict[int, LibraryTrack]
     links: Links
 
 
@@ -35,7 +48,7 @@ class RadioTaste:
     partner: set[int]
 
 
-def build_radio_model(tracks: list[Track], playlists: Iterable[set[str]]) -> RadioModel:
+def build_radio_model(tracks: list[LibraryTrack], playlists: Iterable[set[str]]) -> RadioModel:
     links: Links = {}
     for artists in playlists:
         weight = 1 / math.sqrt(len(artists) or 1)
@@ -54,7 +67,7 @@ def excluded_ids(exclude: str) -> set[int]:
 
 def draw_radio(
     model: RadioModel,
-    seed: Track,
+    seed: LibraryTrack,
     skip: set[int],
     taste: RadioTaste,
     count: int,
@@ -77,9 +90,9 @@ def draw_radio(
     return spaced(picked, seed["artist"])
 
 
-def capped(tracks: Iterable[Track], seed_artist: str, count: int) -> list[Track]:
+def capped(tracks: Iterable[LibraryTrack], seed_artist: str, count: int) -> list[LibraryTrack]:
     per: dict[str, int] = {}
-    picked: list[Track] = []
+    picked: list[LibraryTrack] = []
     for track in tracks:
         artist = track["artist"]
         if per.get(artist, 0) < (SEED_ARTIST_CAP if artist == seed_artist else ARTIST_CAP):
@@ -94,14 +107,14 @@ def first_other_artist(tracks: Sequence[Track], artist: str) -> int:
     return next((index for index, track in enumerate(tracks) if track["artist"] != artist), 0)
 
 
-def spaced(picked: Sequence[Track], seed_artist: str) -> list[Track]:
+def spaced(picked: Sequence[LibraryTrack], seed_artist: str) -> list[Track]:
     remaining = list(picked)
     out: list[Track] = []
     last = seed_artist
     while remaining:
         track = remaining.pop(first_other_artist(remaining, last))
         last = track["artist"]
-        out.append({key: value for key, value in track.items() if key != "genre"})
+        out.append(track_of(track))
     return out
 
 

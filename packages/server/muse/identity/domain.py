@@ -2,7 +2,7 @@ import hashlib
 import secrets
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, TypedDict
 
 from muse.shared.errors import DomainError
 
@@ -27,6 +27,20 @@ class TooManyAttemptsError(DomainError):
         self.retry_after = retry_after
 
 
+class PublicUser(TypedDict):
+    id: str
+    name: str
+    animal: str
+    theme: str
+    gen: str
+    dat: str
+    author: bool
+
+
+class Me(PublicUser):
+    partner: PublicUser
+
+
 @dataclass(frozen=True, slots=True)
 class User:
     id: str
@@ -45,7 +59,7 @@ class User:
     def beast(self) -> str:
         return f"{self.emoji} {self.nick}"
 
-    def public(self) -> dict[str, Any]:
+    def public(self) -> PublicUser:
         return {
             "id": self.id,
             "name": self.name,
@@ -78,7 +92,7 @@ class Users:
         wanted = normalize_login(login)
         return next((user for user in self.all if normalize_login(user.login) == wanted), None)
 
-    def me(self, user: User) -> dict[str, Any]:
+    def me(self, user: User) -> Me:
         return {**user.public(), "partner": self.partner(user).public()}
 
 

@@ -4,7 +4,7 @@ from dishka.integrations.litestar import FromDishka, inject
 from litestar import Request, Router, get
 from litestar.params import FromPath
 
-from muse.daily.domain import NO_PLAYLIST
+from muse.daily.domain import NO_PLAYLIST, DailyDay, DailyPage
 from muse.daily.service import DailyPlaylists
 from muse.identity.domain import User
 from muse.shared.errors import domain_errors
@@ -16,15 +16,13 @@ ERRORS = {NO_PLAYLIST: 404}
 @inject
 async def daily(
     request: Request[User, str, Any], playlists: FromDishka[DailyPlaylists]
-) -> dict[str, Any]:
+) -> DailyDay:
     return await playlists.latest(request.user.id)
 
 
 @get("/daily/{pid:int}")
 @inject
-async def daily_playlist(
-    pid: FromPath[int], playlists: FromDishka[DailyPlaylists]
-) -> dict[str, Any]:
+async def daily_playlist(pid: FromPath[int], playlists: FromDishka[DailyPlaylists]) -> DailyPage:
     return await playlists.require(pid)
 
 

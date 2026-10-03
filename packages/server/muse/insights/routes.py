@@ -5,7 +5,7 @@ from litestar import Request, Router, get
 from litestar.params import FromQuery, QueryParameter
 
 from muse.identity.domain import User
-from muse.insights.domain import BAD_WHO
+from muse.insights.domain import BAD_WHO, StatsSummary, UsStats
 from muse.insights.service import ListeningStats
 from muse.shared.errors import domain_errors
 
@@ -19,7 +19,7 @@ async def stats(
     listening: FromDishka[ListeningStats],
     days: Annotated[int, QueryParameter(ge=1, le=365)] = 30,
     who: FromQuery[str] = "me",
-) -> dict[str, Any]:
+) -> StatsSummary:
     return await listening.summary(request.user.id, days, who)
 
 
@@ -29,7 +29,7 @@ async def stats_us(
     request: Request[User, str, Any],
     listening: FromDishka[ListeningStats],
     days: Annotated[int, QueryParameter(ge=1, le=365)] = 30,
-) -> dict[str, Any]:
+) -> UsStats:
     return await listening.us(request.user.id, days)
 
 

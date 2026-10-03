@@ -1,5 +1,4 @@
 from datetime import date
-from typing import Any
 
 import structlog
 
@@ -10,7 +9,10 @@ from muse.daily.domain import (
     PAST_TITLES,
     TASTE_DAYS,
     Ask,
+    DailyCard,
+    DailyDay,
     DailyDraft,
+    DailyPage,
     DailyStore,
     Listening,
     TasteSource,
@@ -36,10 +38,10 @@ class DailyPlaylists:
         self.catalog = catalog
         self.clock = clock
 
-    async def latest(self, user_id: str) -> dict[str, Any]:
+    async def latest(self, user_id: str) -> DailyDay:
         day = await self.store.latest_day(self.clock.today().isoformat())
         rows = await self.store.of_day(day) if day else []
-        playlists: list[dict[str, Any]] = []
+        playlists: list[DailyCard] = []
         for row in shown_order(rows, user_id):
             tracks = await self.catalog.tracks_in_order(row["tracks"])
             if tracks:
@@ -56,7 +58,7 @@ class DailyPlaylists:
                 )
         return {"day": day, "playlists": playlists}
 
-    async def playlist(self, playlist_id: int) -> dict[str, Any] | None:
+    async def playlist(self, playlist_id: int) -> DailyPage | None:
         row = await self.store.get(playlist_id)
         if row is None:
             return None
@@ -71,7 +73,7 @@ class DailyPlaylists:
             "albums": await self.catalog.cover_ids(tracks),
         }
 
-    async def require(self, playlist_id: int) -> dict[str, Any]:
+    async def require(self, playlist_id: int) -> DailyPage:
         found = await self.playlist(playlist_id)
         if found is None:
             raise DomainError(NO_PLAYLIST)

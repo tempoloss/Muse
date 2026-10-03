@@ -1,7 +1,10 @@
 import random
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from datetime import date
-from typing import Any, Protocol
+from typing import NotRequired, Protocol, TypedDict
+
+from muse.catalog.domain import AlbumCard, Track
+from muse.insights.domain import ArtistPlays
 
 HOME_TTL_S = 120
 CONTINUE_LIMIT = 6
@@ -17,6 +20,38 @@ TOP_ARTISTS_WINDOW_MS = 30 * DAY_MS
 OTHER_GENRE = "Other"
 
 
+class ContinueCard(TypedDict):
+    kind: str
+    title: str
+    subtitle: str
+    albums: list[int]
+    album_id: NotRequired[int]
+    name: NotRequired[str]
+    genre: NotRequired[str]
+    id: NotRequired[int]
+
+
+class MixCard(TypedDict):
+    genre: str
+    title: str
+    tracks: int
+    albums: list[int]
+
+
+HomeView = TypedDict(
+    "HomeView",
+    {
+        "continue": list[ContinueCard],
+        "recent": list[Track],
+        "top_artists": list[ArtistPlays],
+        "mixes": list[MixCard],
+        "forgotten": list[AlbumCard],
+        "both_like": list[Track],
+        "partner_recent": list[Track],
+    },
+)
+
+
 def home_key(user_id: str, day: date) -> str:
     return f"user:{user_id}:home:{day.isoformat()}"
 
@@ -28,8 +63,8 @@ def mix_genres(ranked: Iterable[str], genres: Sequence[str]) -> list[str]:
 
 
 def forgotten_albums(
-    albums: Sequence[Mapping[str, Any]], heard: set[int], user_id: str, day: date
-) -> list[Mapping[str, Any]]:
+    albums: Sequence[AlbumCard], heard: set[int], user_id: str, day: date
+) -> list[AlbumCard]:
     pool = [
         album
         for album in albums

@@ -7,6 +7,7 @@ from litestar.datastructures import Cookie
 from muse.identity.domain import (
     SESSION_COOKIE,
     SESSION_TTL_S,
+    Me,
     TooManyAttemptsError,
     User,
     Users,
@@ -39,7 +40,7 @@ def client_address(request: Request) -> str:
 @inject
 async def login(
     data: LoginBody, request: Request, service: FromDishka[LoginService]
-) -> Response[dict[str, Any]]:
+) -> Response[Me]:
     result = await service.login(
         data.login, data.password, client_address(request), request.headers.get("user-agent", "")
     )
@@ -56,7 +57,7 @@ async def logout(request: Request, service: FromDishka[SessionService]) -> Respo
 
 @get("/me")
 @inject
-async def me(request: Request[User, str, Any], users: FromDishka[Users]) -> dict[str, Any]:
+async def me(request: Request[User, str, Any], users: FromDishka[Users]) -> Me:
     return users.me(request.user)
 
 

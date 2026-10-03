@@ -1,11 +1,55 @@
 from collections.abc import Callable, Iterable
-from typing import Any, Protocol
+from typing import Protocol, TypedDict
+
+from muse.catalog.domain import Track
 
 DAY_MS = 86400 * 1000
 WHO = ("me", "partner")
 TOP_ARTISTS = 10
 COMMON_ARTISTS = 5
 BAD_WHO = "bad who"
+
+
+class ArtistPlays(TypedDict):
+    name: str
+    plays: int
+
+
+class CommonArtist(TypedDict):
+    name: str
+    me: int
+    partner: int
+
+
+class TopTrack(Track):
+    plays: int
+
+
+class SharedSong(Track):
+    me: int
+    partner: int
+
+
+class LetterCounts(TypedDict):
+    me: int
+    partner: int
+
+
+class StatsSummary(TypedDict):
+    plays: int
+    minutes: int
+    top_artists: list[ArtistPlays]
+    top_tracks: list[TopTrack]
+    by_hour: list[int]
+
+
+class UsStats(TypedDict):
+    together_minutes: int
+    both_likes: int
+    ours: int
+    letters: LetterCounts
+    common_artists: list[CommonArtist]
+    song: SharedSong | None
 
 
 def hours_histogram(starts: Iterable[int], hour_of: Callable[[int], int]) -> list[int]:
@@ -15,7 +59,7 @@ def hours_histogram(starts: Iterable[int], hour_of: Callable[[int], int]) -> lis
     return hours
 
 
-def common_artists(mine: dict[str, int], theirs: dict[str, int]) -> list[dict[str, Any]]:
+def common_artists(mine: dict[str, int], theirs: dict[str, int]) -> list[CommonArtist]:
     shared = [
         (name, plays, theirs[name]) for name, plays in mine.items() if plays and theirs.get(name)
     ]
@@ -35,9 +79,7 @@ class PlayStats(Protocol):
 
     async def play_starts(self, user_id: str, since_ms: int) -> list[int]: ...
 
-    async def top_artists(
-        self, user_id: str, since_ms: int, limit: int
-    ) -> list[dict[str, Any]]: ...
+    async def top_artists(self, user_id: str, since_ms: int, limit: int) -> list[ArtistPlays]: ...
 
     async def artist_plays(self, user_id: str, since_ms: int) -> dict[str, int]: ...
 

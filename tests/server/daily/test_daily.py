@@ -10,6 +10,7 @@ from litestar import Litestar
 from litestar.testing import AsyncTestClient
 
 from muse.app import create_app
+from muse.catalog.domain import LibraryTrack
 from muse.daily.domain import Ask, Listening, daily_pool
 from muse.daily.service import DailyMaker
 from muse.discovery.service import RadioModels
@@ -28,7 +29,7 @@ async def app(settings: Settings) -> AsyncIterator[Litestar]:
         yield application
 
 
-async def first_pool(app: Litestar) -> list[dict[str, Any]]:
+async def first_pool(app: Litestar) -> list[LibraryTrack]:
     container = app.state.dishka_container
     users = await container.get(Users)
     model = await (await container.get(RadioModels)).current()

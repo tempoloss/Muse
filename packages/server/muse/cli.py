@@ -12,7 +12,7 @@ import uvicorn
 from dishka import make_async_container
 
 from muse.app import app_providers, create_app
-from muse.catalog.domain import Row
+from muse.catalog.domain import Track
 from muse.catalog.service import Catalog
 from muse.daily.service import DailyMaker
 from muse.identity.domain import InvalidUsersError, Users
@@ -51,7 +51,7 @@ def read_head(path: Path) -> bool:
         return bool(audio.read(READ_BYTES))
 
 
-async def playable(catalog: Catalog, tracks: Sequence[Row]) -> bool:
+async def playable(catalog: Catalog, tracks: Sequence[Track]) -> bool:
     for track in tracks:
         try:
             path = await catalog.stream_file(track["id"])

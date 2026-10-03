@@ -1,7 +1,7 @@
 from datetime import date
 
 from muse.activity.domain import LikeChanged, PlayRecorded
-from muse.catalog.domain import NO_ALBUM
+from muse.catalog.domain import NO_ALBUM, AlbumCard
 from muse.catalog.service import Catalog
 from muse.identity.domain import Users
 from muse.notifications.service import Notifier
@@ -20,14 +20,16 @@ from muse.pet.domain import (
     TAKES_TURNS,
     TREAT,
     TURN_MS,
+    CaredView,
     ListeningTogether,
     Pet,
     PetRepository,
+    PetView,
     QuestAlbumChosen,
     QuestPick,
     QuestProgress,
     QuestRepository,
-    Row,
+    QuestView,
     added,
     album_progress,
     any_album,
@@ -76,13 +78,13 @@ class Quests:
         self.users = users
         self.clock = clock
 
-    async def today(self, user_id: str) -> Row:
+    async def today(self, user_id: str) -> QuestView:
         today = self.clock.today()
         picked = await self.quests.picked(today.isoformat())
         kind = picked.kind if picked else quest_kind(today)
         return quest_view(kind, await self._progress(kind, picked, user_id, today), picked)
 
-    async def playable_album(self, album_id: int) -> Row:
+    async def playable_album(self, album_id: int) -> AlbumCard:
         found = next((a for a in await self.catalog.albums() if a["id"] == album_id), None)
         if found is None:
             raise DomainError(NO_ALBUM)
@@ -138,7 +140,7 @@ class PetViews:
         self.together = together
         self.clock = clock
 
-    async def view(self, user_id: str, now: int) -> Row:
+    async def view(self, user_id: str, now: int) -> PetView:
         pet = await self.keeper.tick(now)
         quest = await self.quests.today(user_id)
         day = self.clock.today().isoformat()
@@ -166,12 +168,12 @@ class PetCare:
         self.clock = clock
         self.uow = uow
 
-    async def show(self, user_id: str) -> Row:
+    async def show(self, user_id: str) -> PetView:
         view = await self.views.view(user_id, self.clock.now_ms())
         await self.uow.commit()
         return view
 
-    async def rename(self, user_id: str, name: str) -> Row:
+    async def rename(self, user_id: str, name: str) -> PetView:
         name = name.strip()
         if not valid_name(name):
             raise DomainError(BAD_NAME)
@@ -182,7 +184,7 @@ class PetCare:
         await self.uow.commit()
         return view
 
-    async def act(self, user_id: str, action: str) -> Row:
+    async def act(self, user_id: str, action: str) -> CaredView:
         if action not in CARE:
             raise DomainError(NO_SUCH_ACTION)
         now = self.clock.now_ms()
@@ -257,7 +259,7 @@ class QuestAlbums:
         self.clock = clock
         self.uow = uow
 
-    async def choose(self, user_id: str, album_id: int) -> Row:
+    async def choose(self, user_id: str, album_id: int) -> PetView:
         album = await self.quests.playable_album(album_id)
         now = self.clock.now_ms()
         await self.pets.lock()

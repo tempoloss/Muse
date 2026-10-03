@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 from litestar import Litestar
 
-from muse.catalog.domain import LibraryRoot
+from muse.catalog.domain import LibraryRoot, TrackMatch
 from muse.catalog.infra.files import TrackFiles
 from muse.catalog.infra.library import LibraryFiles
 from muse.catalog.infra.playlists import PlaylistFiles
@@ -95,7 +95,10 @@ async def test_album_heads_exist_only_for_albums_with_playable_tracks(
 async def test_cover_mosaics_take_the_first_four_covered_albums(
     catalog: Catalog, settings: Settings
 ) -> None:
-    tracks = [{"album_id": album_id} for album_id in (5, 3, 5, 9, 1, 7, 2)]
+    tracks: list[TrackMatch] = [
+        {"id": n, "title": "t", "album": "a", "album_id": album_id, "artist": "x", "dur": None}
+        for n, album_id in enumerate((5, 3, 5, 9, 1, 7, 2))
+    ]
     settings.paths.covers_dir.mkdir()
     for album_id in (3, 9, 1, 7, 2):
         (settings.paths.covers_dir / f"{album_id}.jpg").write_bytes(b"jpg")

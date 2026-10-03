@@ -7,7 +7,17 @@ from litestar.params import FromPath, FromQuery, QueryParameter
 from muse.catalog.domain import NO_TRACK
 from muse.identity.domain import User
 from muse.shared.errors import domain_errors
-from muse.together.domain import BAD_TEXT, FOLLOW_WAIT_S, NO_LETTER, PARTNER_FOLLOWS, Note
+from muse.together.domain import (
+    BAD_TEXT,
+    FOLLOW_WAIT_S,
+    NO_LETTER,
+    PARTNER_FOLLOWS,
+    FollowView,
+    LetterList,
+    LiveView,
+    NotesView,
+    OursView,
+)
 from muse.together.schemas import LetterBody, LiveBody
 from muse.together.service import Following, Letters, Live, Notes, Ours
 
@@ -18,13 +28,13 @@ ERRORS = {NO_TRACK: 404, PARTNER_FOLLOWS: 409, BAD_TEXT: 422, NO_LETTER: 404}
 @inject
 async def report_beat(
     data: LiveBody, request: Request[User, str, Any], live: FromDishka[Live]
-) -> dict[str, Any]:
+) -> LiveView:
     return await live.beat(request.user.id, data.track_id, data.position, data.playing)
 
 
 @get("/live")
 @inject
-async def live_view(request: Request[User, str, Any], live: FromDishka[Live]) -> dict[str, Any]:
+async def live_view(request: Request[User, str, Any], live: FromDishka[Live]) -> LiveView:
     return await live.view(request.user.id)
 
 
@@ -35,7 +45,7 @@ async def follow(
     following: FromDishka[Following],
     since: FromQuery[int] = 0,
     wait: Annotated[float, QueryParameter(ge=0, le=FOLLOW_WAIT_S)] = FOLLOW_WAIT_S,
-) -> dict[str, Any]:
+) -> FollowView:
     return await following.follow(request.user.id, since, wait)
 
 
@@ -57,7 +67,7 @@ async def send_letter(
 @inject
 async def letters_view(
     request: Request[User, str, Any], letters: FromDishka[Letters]
-) -> dict[str, list[dict[str, Any]]]:
+) -> LetterList:
     return await letters.listing(request.user.id)
 
 
@@ -71,7 +81,7 @@ async def read_letter(
 
 @get("/ours")
 @inject
-async def ours_view(ours: FromDishka[Ours]) -> dict[str, list[Any]]:
+async def ours_view(ours: FromDishka[Ours]) -> OursView:
     return await ours.listing()
 
 
@@ -93,9 +103,7 @@ async def remove_ours(
 
 @get("/notes")
 @inject
-async def notes_view(
-    request: Request[User, str, Any], notes: FromDishka[Notes]
-) -> dict[str, list[Note]]:
+async def notes_view(request: Request[User, str, Any], notes: FromDishka[Notes]) -> NotesView:
     return await notes.daily(request.user.id)
 
 

@@ -1,5 +1,4 @@
 import random
-from typing import Any
 
 import anyio
 
@@ -14,13 +13,19 @@ from muse.together.domain import (
     NO_LETTER,
     PARTNER_FOLLOWS,
     Beat,
+    FollowView,
     LetterBox,
+    LetterList,
     LetterSent,
     LiveBoard,
-    Note,
+    LiveView,
+    Mirrored,
     NotesSource,
+    NotesView,
     OursChanged,
     OursList,
+    OursTrack,
+    OursView,
     TogetherAccrued,
     TogetherLedger,
     letter_text,
@@ -54,7 +59,7 @@ class Live:
 
     async def beat(
         self, user_id: str, track_id: int | None, position: float, playing: bool
-    ) -> dict[str, Any]:
+    ) -> LiveView:
         if track_id is not None:
             await self.catalog.playable_duration(track_id)
         now = self.clock.now_ms()
@@ -67,10 +72,10 @@ class Live:
             await self.uow.commit()
         return await self._view(user_id, now)
 
-    async def view(self, user_id: str) -> dict[str, Any]:
+    async def view(self, user_id: str) -> LiveView:
         return await self._view(user_id, self.clock.now_ms())
 
-    async def _view(self, user_id: str, now: int) -> dict[str, Any]:
+    async def _view(self, user_id: str, now: int) -> LiveView:
         beat, following = self.board.partner_state(self.users.partner_id(user_id), now)
         track_id = beat.track_id if beat else None
         partner = None
@@ -91,7 +96,7 @@ class Following:
         self.users = users
         self.clock = clock
 
-    async def follow(self, user_id: str, since: int, wait: float) -> dict[str, Any]:
+    async def follow(self, user_id: str, since: int, wait: float) -> FollowView:
         partner_id = self.users.partner_id(user_id)
         if not self.board.start_following(user_id, partner_id, self.clock.now_ms()):
             raise DomainError(PARTNER_FOLLOWS)
@@ -105,7 +110,7 @@ class Following:
     def unfollow(self, user_id: str) -> None:
         self.board.stop_following(user_id)
 
-    async def _mirrored(self, beat: Beat | None, now: int) -> dict[str, Any] | None:
+    async def _mirrored(self, beat: Beat | None, now: int) -> Mirrored | None:
         track_id = mirrored_track_id(beat, now)
         if beat is None or track_id is None:
             return None
@@ -139,7 +144,7 @@ class Letters:
         await self.uow.commit()
         return {"id": letter_id}
 
-    async def listing(self, user_id: str) -> dict[str, list[dict[str, Any]]]:
+    async def listing(self, user_id: str) -> LetterList:
         received = await self.letters.received(user_id)
         sent = await self.letters.sent(user_id)
         tracks = await self.catalog.track_rows([letter.track_id for letter in (*received, *sent)])
@@ -165,10 +170,10 @@ class Ours:
         self.bus = bus
         self.uow = uow
 
-    async def listing(self) -> dict[str, list[Any]]:
+    async def listing(self) -> OursView:
         marks = await self.ours.marks()
         rows = await self.catalog.track_rows([mark.track_id for mark in marks])
-        tracks = [
+        tracks: list[OursTrack] = [
             {**rows[mark.track_id], "added_by": mark.added_by, "added_at": mark.added_at}
             for mark in marks
             if mark.track_id in rows
@@ -192,7 +197,7 @@ class Notes:
         self.source = source
         self.clock = clock
 
-    async def daily(self, user_id: str) -> dict[str, list[Note]]:
+    async def daily(self, user_id: str) -> NotesView:
         pool = await self.source.notes(user_id)
         shuffle = random.Random(f"{user_id}:notes:{self.clock.today()}")
         return {"notes": shuffle.sample(pool, len(pool))}

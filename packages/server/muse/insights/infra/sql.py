@@ -1,6 +1,7 @@
-from typing import Any
+from typing import cast
 
 from muse.activity.domain import COUNTED, PLAY_ARTIST, PLAYS_LIB
+from muse.insights.domain import ArtistPlays
 from muse.shared.db import UnitOfWork
 
 COUNTED_FOR = f"WHERE p.user=? AND p.started_at>=? AND {COUNTED} "
@@ -37,8 +38,9 @@ class SqlStats:
         rows = await self.uow.rows(PLAY_STARTS, (user_id, since_ms))
         return [row["started_at"] for row in rows]
 
-    async def top_artists(self, user_id: str, since_ms: int, limit: int) -> list[dict[str, Any]]:
-        return await self.uow.rows(TOP_ARTISTS, (user_id, since_ms, limit))
+    async def top_artists(self, user_id: str, since_ms: int, limit: int) -> list[ArtistPlays]:
+        rows = await self.uow.rows(TOP_ARTISTS, (user_id, since_ms, limit))
+        return cast("list[ArtistPlays]", rows)
 
     async def artist_plays(self, user_id: str, since_ms: int) -> dict[str, int]:
         rows = await self.uow.rows(PLAYS_BY_ARTIST, (user_id, since_ms))
