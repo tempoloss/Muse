@@ -1,0 +1,5 @@
+[Unit]
+Description=Muse backup snapshot
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/muse-backup-snapshot

@@ -1,0 +1,29 @@
+[Unit]
+Description=Muse server
+Wants=network-online.target redis-server.service
+After=network-online.target redis-server.service muse-lib.service
+Requires=muse-lib.service
+[Service]
+User=muse
+Group=muse
+Environment=MUSE_CONFIG=/etc/muse/muse.toml
+ExecStart=/opt/muse/current/venv/bin/muse serve
+Restart=always
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/srv/muse/data
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+[Install]
+WantedBy=multi-user.target

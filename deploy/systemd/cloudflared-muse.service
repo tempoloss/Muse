@@ -1,0 +1,16 @@
+[Unit]
+Description=Cloudflare tunnel for Muse
+Wants=network-online.target
+After=network-online.target muse.service
+[Service]
+User=cloudflared
+Group=cloudflared
+ExecStart=/usr/bin/cloudflared --no-autoupdate --config /etc/cloudflared/muse.yml tunnel run
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+[Install]
+WantedBy=multi-user.target

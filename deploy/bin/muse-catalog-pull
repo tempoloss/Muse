@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+data=/srv/muse/data
+remote_md5=$(rclone md5sum "$MUSE_CATALOG_REMOTE" | cut -d' ' -f1)
+[ -n "$remote_md5" ] || { echo "catalog: remote missing" >&2; exit 1; }
+local_md5=$(md5sum "$data/state.sqlite" 2>/dev/null | cut -d' ' -f1 || true)
+[ "$remote_md5" = "$local_md5" ] && exit 0
+tmp="$data/.state.sqlite.new"
+rclone copyto "$MUSE_CATALOG_REMOTE" "$tmp"
+[ "$(md5sum "$tmp" | cut -d' ' -f1)" = "$remote_md5" ] || { rm -f "$tmp"; echo "catalog: md5 mismatch" >&2; exit 1; }
+[ "$(sqlite3 -readonly "$tmp" 'PRAGMA integrity_check;')" = "ok" ] || { rm -f "$tmp"; echo "catalog: integrity failed" >&2; exit 1; }
+chown muse:muse "$tmp"; chmod 640 "$tmp"
+mv -f "$tmp" "$data/state.sqlite"
+echo "catalog: updated $remote_md5"

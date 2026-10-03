@@ -1,0 +1,6 @@
+[Unit]
+Description=Muse catalog pull
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/muse/storage.env
+ExecStart=/usr/local/bin/muse-catalog-pull
