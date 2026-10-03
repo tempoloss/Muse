@@ -22,6 +22,9 @@ filterwarnings = ["error::DeprecationWarning"]
 [tool.coverage.run]
 source = ["muse", "muse_agent"]
 
+[tool.coverage.report]
+fail_under = 96
+
 [tool.ty.environment]
 root = ["packages/server", "packages/agent", "."]
 
