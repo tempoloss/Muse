@@ -71,7 +71,11 @@ revision. To bring a server back from an archive:
     chown -R muse:muse /srv/muse/data
     chmod 600 /srv/muse/data/muse.sqlite
     runuser -u muse -- /opt/muse/current/venv/bin/muse db upgrade
+    runuser -u muse -- /opt/muse/current/venv/bin/muse check
     systemctl start muse
+
+`muse check` names whatever the release cannot serve from the restored data, such as a
+`users.json` from before a format change; `deploy/users.example.json` shows the current one.
 
 ## License
 
