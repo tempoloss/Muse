@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from muse.cli import main, upgrade_database
+from muse.cli import main
+from muse.userdb import upgrade_database
 
 UNVERSIONED_SCHEMA = (
     Path(__file__).resolve().parents[1] / "fixtures" / "unversioned_user_schema.sql"
@@ -61,6 +62,22 @@ def query(path: Path, sql: str) -> list[tuple[object, ...]]:
         connection.close()
 
 
+def change(path: Path, script: str) -> None:
+    connection = sqlite3.connect(path)
+    try:
+        connection.executescript(script)
+    finally:
+        connection.close()
+
+
+@pytest.fixture
+def configured(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    config = tmp_path / "muse.toml"
+    config.write_text(CONFIG.format(data=(tmp_path / "data").as_posix()), encoding="utf-8")
+    monkeypatch.setenv("MUSE_CONFIG", str(config))
+    return tmp_path / "data" / "muse.sqlite"
+
+
 def test_a_fresh_database_matches_the_unversioned_schema(tmp_path: Path) -> None:
     fresh = tmp_path / "data" / "muse.sqlite"
 
@@ -96,13 +113,29 @@ def test_upgrading_an_unversioned_database_keeps_every_row(tmp_path: Path) -> No
     assert query(path, "SELECT version_num FROM alembic_version") == [("0001",)]
 
 
-def test_the_cli_upgrades_the_configured_database(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    config = tmp_path / "muse.toml"
-    config.write_text(CONFIG.format(data=(tmp_path / "data").as_posix()), encoding="utf-8")
-    monkeypatch.setenv("MUSE_CONFIG", str(config))
-
+def test_the_cli_upgrades_the_configured_database(configured: Path) -> None:
     assert main(["db", "upgrade"]) == 0
 
-    assert query(tmp_path / "data" / "muse.sqlite", "SELECT COUNT(*) FROM pet") == [(1,)]
+    assert query(configured, "SELECT COUNT(*) FROM pet") == [(1,)]
+
+
+def test_restore_puts_back_the_database_saved_before_a_broken_upgrade(configured: Path) -> None:
+    assert main(["db", "upgrade"]) == 0
+    change(configured, "INSERT INTO likes VALUES ('bob', 7, 2000);")
+    assert main(["db", "snapshot"]) == 0
+    change(configured, "DROP TABLE likes; UPDATE alembic_version SET version_num='0002';")
+
+    assert main(["db", "restore"]) == 0
+
+    assert query(configured, "SELECT * FROM likes") == [("bob", 7, 2000)]
+    assert query(configured, "SELECT version_num FROM alembic_version") == [("0001",)]
+    assert query(configured, "PRAGMA integrity_check") == [("ok",)]
+
+
+def test_restore_without_a_snapshot_leaves_the_database_alone(configured: Path) -> None:
+    assert main(["db", "upgrade"]) == 0
+    change(configured, "INSERT INTO likes VALUES ('bob', 7, 2000);")
+
+    assert main(["db", "restore"]) == 1
+
+    assert query(configured, "SELECT * FROM likes") == [("bob", 7, 2000)]

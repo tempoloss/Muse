@@ -14,11 +14,11 @@ from litestar.testing import AsyncTestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from muse.app import create_app
-from muse.cli import upgrade_database
 from muse.notifications.domain import PushSender
 from muse.notifications.infra.sender import RecordingSender
 from muse.settings import HttpSettings, PathsSettings, PushSettings, Settings
 from muse.shared.db import user_engine
+from muse.userdb import upgrade_database
 from tests.fixtures.catalog import FixtureCatalog, build_catalog
 from tests.server.support import ORIGIN, PASSWORDS, browser, signed_in
 

@@ -1,7 +1,6 @@
 import argparse
 import getpass
 import json
-import sqlite3
 import sys
 from collections.abc import AsyncIterator, Sequence
 from datetime import date
@@ -10,35 +9,84 @@ from typing import Any
 
 import anyio
 import uvicorn
-from alembic import command
-from alembic.config import Config
 from dishka import make_async_container
 
 from muse.app import app_providers, create_app
+from muse.catalog.domain import Row
+from muse.catalog.service import Catalog
 from muse.daily.service import DailyMaker
-from muse.identity.domain import InvalidUsersError
+from muse.identity.domain import InvalidUsersError, Users
 from muse.identity.infra.users_file import UsersFile
 from muse.identity.service import PasswordService
 from muse.settings import Settings, load_settings
 from muse.shared.errors import DomainError
 from muse.shared.logging import configure_logging
+from muse.userdb import (
+    UserDatabaseError,
+    database_problems,
+    restore_database,
+    snapshot_database,
+    upgrade_database,
+)
 
-MIGRATIONS = "muse:migrations"
 DAILY_REMOTE = "daily-remote"
 AGENT_PREFIX = "MUSE:"
+PLAYBACK_SAMPLE = 5
+READ_BYTES = 4096
 
 
-def upgrade_database(user_db: Path) -> None:
-    user_db.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(user_db)
+def database(settings: Settings, action: str) -> int:
+    paths = settings.paths
+    if action == "snapshot":
+        snapshot_database(paths.user_db, paths.upgrade_snapshot)
+    elif action == "restore":
+        restore_database(paths.upgrade_snapshot, paths.user_db)
+    else:
+        upgrade_database(paths.user_db)
+    return 0
+
+
+def read_head(path: Path) -> bool:
+    with path.open("rb") as audio:
+        return bool(audio.read(READ_BYTES))
+
+
+async def playable(catalog: Catalog, tracks: Sequence[Row]) -> bool:
+    for track in tracks:
+        try:
+            path = await catalog.stream_file(track["id"])
+            if await anyio.to_thread.run_sync(read_head, path):
+                return True
+        except DomainError, OSError:
+            continue
+    return False
+
+
+async def health(settings: Settings) -> list[str]:
+    problems = database_problems(settings.paths.user_db)
+    container = make_async_container(*app_providers(settings))
     try:
-        connection.execute("PRAGMA journal_mode=WAL")
+        async with container() as request:
+            catalog = await request.get(Catalog)
+            tracks = await catalog.library_tracks()
+            if not tracks:
+                problems.append("the catalog has no playable tracks")
+            elif not await playable(catalog, tracks[:PLAYBACK_SAMPLE]):
+                problems.append(f"none of the first {PLAYBACK_SAMPLE} tracks has a readable file")
+            users = await request.get(Users)
+            report = f"{len(users.all)} users, {len(tracks)} playable tracks"
     finally:
-        connection.close()
-    config = Config()
-    config.set_main_option("script_location", MIGRATIONS)
-    config.attributes["database"] = user_db
-    command.upgrade(config, "head")
+        await container.close()
+    if not problems:
+        sys.stdout.write(f"ok: {report}\n")
+    return problems
+
+
+def check(settings: Settings) -> int:
+    problems = anyio.run(health, settings)
+    for problem in problems:
+        sys.stderr.write(f"{problem}\n")
+    return 1 if problems else 0
 
 
 def serve(settings: Settings) -> None:
@@ -116,10 +164,13 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="muse")
     commands = root.add_subparsers(dest="command", required=True)
     commands.add_parser("serve", help="run the HTTP server")
-    database = commands.add_parser("db", help="manage the user database")
-    database.add_subparsers(dest="action", required=True).add_parser(
-        "upgrade", help="create or migrate the user database"
+    actions = commands.add_parser("db", help="manage the user database").add_subparsers(
+        dest="action", required=True
     )
+    actions.add_parser("upgrade", help="create or migrate the user database")
+    actions.add_parser("snapshot", help="save the user database before an upgrade")
+    actions.add_parser("restore", help="put back the database saved by snapshot")
+    commands.add_parser("check", help="check the user database, the catalog and the track files")
     passwd = commands.add_parser("passwd", help="set a user's password in users.json")
     passwd.add_argument("user")
     passwd.add_argument("--random", action="store_true", help="generate and print a password")
@@ -136,8 +187,9 @@ def run(args: argparse.Namespace, settings: Settings) -> int:
         return set_password(settings, args.user, random=args.random)
     if args.command == DAILY_REMOTE:
         return anyio.run(daily_remote, settings, args.day)
-    upgrade_database(settings.paths.user_db)
-    return 0
+    if args.command == "check":
+        return check(settings)
+    return database(settings, args.action)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -145,6 +197,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     configure_logging(sys.stderr if args.command == DAILY_REMOTE else None)
     try:
         return run(args, load_settings())
-    except (InvalidUsersError, DomainError) as error:
+    except (InvalidUsersError, DomainError, UserDatabaseError) as error:
         sys.stderr.write(f"{error}\n")
         return 1

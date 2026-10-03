@@ -33,6 +33,10 @@ class PathsSettings(Section):
         return self.data_dir / "muse.sqlite"
 
     @property
+    def upgrade_snapshot(self) -> Path:
+        return self.data_dir / "muse.pre-upgrade.sqlite"
+
+    @property
     def notes_dir(self) -> Path:
         return self.data_dir / "notes"
 
