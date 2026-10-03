@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from muse_agent.backup import BackupError, pull_backup
+from muse_agent.main import agent_jobs
 from muse_agent.proc import Remote
 from muse_agent.settings import AgentConfig
 from tests.agent.support import FakeRclone, agent_config
@@ -72,7 +73,7 @@ def test_a_pulled_backup_is_uploaded_and_old_copies_are_pruned(
         "muse-notes.tar.gz",
     ]
     assert rclone.calls == [
-        ["rclone", "copy", str(stored), "storage:bucket/backups"],
+        ["rclone", "copyto", f"{stored}.part", "storage:bucket/backups/muse-2026-10-03.tar.gz"],
         ["rclone", "delete", "storage:bucket/backups", "--min-age", "30d"],
     ]
 
@@ -107,3 +108,20 @@ def test_a_failing_remote_leaves_no_file(tmp_path: Path, cfg: AgentConfig) -> No
 
     assert list((cfg.paths.work_dir / "backups").iterdir()) == []
     assert rclone.calls == []
+
+
+def test_a_failed_upload_leaves_the_day_open_for_the_next_tick(
+    tmp_path: Path, cfg: AgentConfig
+) -> None:
+    remote = streaming(tmp_path, archive(tmp_path, "muse.sqlite"))
+    has_backup = agent_jobs(cfg).has_backup
+
+    with pytest.raises(BackupError, match="upload failed rc=3"):
+        pull_backup(cfg, DAY, remote=remote, run=lambda _: 3)
+
+    assert not has_backup(DAY)
+    assert list((cfg.paths.work_dir / "backups").iterdir()) == []
+
+    pull_backup(cfg, DAY, remote=remote, run=FakeRclone())
+
+    assert has_backup(DAY)

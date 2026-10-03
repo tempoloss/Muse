@@ -26,17 +26,17 @@ def pull_backup(
     archive = backup_path(cfg, day)
     archive.parent.mkdir(parents=True, exist_ok=True)
     part = archive.with_name(f"{archive.name}.part")
+    rclone = cfg.rclone
     try:
         download((remote or ssh(cfg.vps.agent_host))("backup"), part)
         verify(part)
+        code = run([rclone.exe, "copyto", str(part), remote_file(rclone.backups_remote, archive)])
+        if code != 0:
+            raise BackupError(f"backup: upload failed rc={code}")
     except BaseException:
         part.unlink(missing_ok=True)
         raise
     part.replace(archive)
-    rclone = cfg.rclone
-    code = run([rclone.exe, "copy", str(archive), rclone.backups_remote])
-    if code != 0:
-        raise BackupError(f"backup: upload failed rc={code}")
     keep_days = cfg.schedule.backup_keep_days
     prune(archive.parent, day - timedelta(days=keep_days))
     code = run([rclone.exe, "delete", rclone.backups_remote, "--min-age", f"{keep_days}d"])
@@ -44,6 +44,11 @@ def pull_backup(
         log.warning("backup: remote prune failed rc=%d", code)
     log.info("backup: %s stored", archive.name)
     return archive
+
+
+def remote_file(folder: str, archive: Path) -> str:
+    separator = "" if folder.endswith((":", "/")) else "/"
+    return f"{folder}{separator}{archive.name}"
 
 
 def download(argv: list[str], part: Path) -> None:
