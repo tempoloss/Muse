@@ -1,10 +1,12 @@
 import os
+import re
 import sqlite3
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
 SQLITE_SIDE_FILES = ("", "-journal", "-wal", "-shm")
+DRIVE = re.compile(r"^[A-Za-z]:/")
 
 
 class SnapshotError(Exception):
@@ -61,13 +63,11 @@ def relocate_tracks(
     root = library_dir.as_posix().rstrip("/") + "/"
     query = "SELECT id, path, status FROM tracks WHERE path IS NOT NULL"
     rows = db.execute(query).fetchall()
-    changes: list[tuple[str, int]] = []
+    changes: list[tuple[str | None, int]] = []
     missing = 0
     for track_id, stored, status in rows:
-        relative = under(stored, root)
-        if relative is None:
-            continue
-        found = on_disk.get(relative.casefold())
+        relative = library_relative(stored, root)
+        found = on_disk.get(relative.casefold()) if relative is not None else None
         if found is None and status == "ok":
             missing += 1
         relocated = found or relative
@@ -77,11 +77,13 @@ def relocate_tracks(
     return SnapshotStats(rows=len(rows), rewritten=len(changes), missing=missing)
 
 
-def under(stored: str, root: str) -> str | None:
+def library_relative(stored: str, root: str) -> str | None:
     path = stored.replace("\\", "/")
-    if path[: len(root)].casefold() != root.casefold():
+    if path[: len(root)].casefold() == root.casefold():
+        return path[len(root) :]
+    if path.startswith("/") or DRIVE.match(path):
         return None
-    return path[len(root) :]
+    return path
 
 
 def discard(database: Path) -> None:

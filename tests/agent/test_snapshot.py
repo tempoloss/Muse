@@ -24,7 +24,7 @@ def damage_status_index(path: Path) -> None:
     path.write_bytes(bytes(data))
 
 
-def test_library_paths_become_relative_paths_spelled_as_on_disk(tmp_path: Path) -> None:
+def test_published_paths_are_library_relative_and_spelled_as_on_disk(tmp_path: Path) -> None:
     library = tmp_path / "lib"
     touch(library, "Indie/X/a.mp3")
     touch(library, "Indie/X/b.mp3")
@@ -47,16 +47,16 @@ def test_library_paths_become_relative_paths_spelled_as_on_disk(tmp_path: Path) 
         stats = make_snapshot(source, library, out)
         source_paths = stored_paths(source)
 
-    assert stats == SnapshotStats(rows=7, rewritten=4, missing=1)
+    assert stats == SnapshotStats(rows=7, rewritten=6, missing=3)
     assert [path.name for path in out.parent.iterdir()] == ["catalog-publish.sqlite"]
     assert stored_paths(out) == [
         "Indie/X/a.mp3",
         "Indie/X/b.mp3",
         "Rock/Gone/c.mp3",
         "Rock/Gone/d.mp3",
-        "E:\\elsewhere\\e.mp3",
+        None,
         "Indie/X/a.mp3",
-        f"{library.as_posix()}x/f.mp3",
+        None,
         None,
     ]
     assert pragma(out, "journal_mode") == "delete"
