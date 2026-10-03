@@ -16,11 +16,8 @@ from muse.lyrics.domain import (
 
 TRANSPORT_ERRORS = (httpx.HTTPError, httpx.InvalidURL)
 HEADS = {"User-Agent": USER_AGENT}
-BAD_GATEWAY = 500
-
-
-def failed(status: int) -> bool:
-    return status >= BAD_GATEWAY
+OK = 200
+UNKNOWN = frozenset({400, 404})
 
 
 class Lrclib:
@@ -34,10 +31,10 @@ class Lrclib:
             )
         except TRANSPORT_ERRORS as error:
             raise UnreachableError() from error
-        if failed(response.status_code):
-            raise UnreachableError()
-        if response.status_code != 200:
+        if response.status_code in UNKNOWN:
             return None
+        if response.status_code != OK:
+            raise UnreachableError()
         try:
             return response.json()
         except ValueError as error:

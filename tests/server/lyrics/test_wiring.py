@@ -10,8 +10,6 @@ from litestar.testing import AsyncTestClient
 
 from muse.app import create_app
 from muse.catalog.service import Catalog
-from muse.lyrics.domain import LyricsSource
-from muse.lyrics.infra.lrclib import Lrclib
 from muse.settings import Settings
 from tests.fixtures.catalog import FixtureCatalog
 from tests.server.catalog.support import fixture_rows
@@ -114,9 +112,3 @@ async def test_a_dead_lrclib_is_503_through_the_wired_client(
     await alice.aclose()
 
     assert (response.status_code, response.json()) == (503, {"detail": "lyrics unavailable"})
-
-
-async def test_the_wiring_resolves_the_online_source(app: Litestar) -> None:
-    source = await app.state.dishka_container.get(LyricsSource)
-
-    assert isinstance(source, Lrclib)

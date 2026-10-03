@@ -153,6 +153,22 @@ async def test_a_server_error_is_unreachable(api: Api, lrclib: Lrclib) -> None:
         await find(lrclib)
 
 
+async def test_a_rate_limit_is_unreachable_not_a_miss(api: Api, lrclib: Lrclib) -> None:
+    api.exact = httpx.Response(429, text="slow down")
+
+    with pytest.raises(UnreachableError):
+        await find(lrclib)
+
+    assert api.paths() == ["/api/get"]
+
+
+async def test_a_rejected_exact_query_falls_back_to_search(api: Api, lrclib: Lrclib) -> None:
+    api.exact = httpx.Response(400, text="bad request")
+    api.found = [hit(DURATION + 1, SYNCED, PLAIN)]
+
+    assert await find(lrclib) == FOUND
+
+
 async def test_a_server_error_during_the_search_is_unreachable() -> None:
     def failing(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/get":
