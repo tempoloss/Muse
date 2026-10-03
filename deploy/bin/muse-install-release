@@ -2,8 +2,7 @@
 set -eu
 sha="${1:-}"
 case "$sha" in ''|*[!0-9a-f]*) echo "bad sha" >&2; exit 2 ;; esac
-rel=/opt/muse/releases/$sha
-rm -rf "$rel"; mkdir -p "$rel"
+rel=$(mktemp -d "/opt/muse/releases/$sha.XXXXXX")
 tar -x -C "$rel"
 export UV_PYTHON_INSTALL_DIR=/opt/muse/python UV_CACHE_DIR=/var/cache/uv UV_PROJECT_ENVIRONMENT="$rel/venv"
 uv sync --frozen --no-dev --package muse-server --project "$rel/src"
@@ -17,9 +16,10 @@ until [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4535/)" = "20
   i=$((i+1))
   if [ "$i" -ge 20 ]; then
     echo "health check failed; rolling back" >&2
-    if [ -n "$prev" ] && [ "$prev" != "$rel" ]; then
+    if [ -n "$prev" ]; then
       ln -sfn "$prev" /opt/muse/current.new && mv -T /opt/muse/current.new /opt/muse/current
       systemctl restart muse
+      rm -rf "$rel"
     fi
     exit 1
   fi
