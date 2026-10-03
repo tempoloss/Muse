@@ -9,21 +9,24 @@ uv sync --frozen --no-dev --package muse-server --project "$rel/src"
 chmod -R a+rX "$rel" /opt/muse/python
 runuser -u muse -- env MUSE_CONFIG=/etc/muse/muse.toml "$rel/venv/bin/muse" db upgrade
 prev=$(readlink -f /opt/muse/current 2>/dev/null || true)
+healthy() {
+  systemctl restart muse || return 1
+  i=0
+  until [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4535/)" = "200" ]; do
+    i=$((i+1))
+    [ "$i" -lt 20 ] || return 1
+    sleep 1
+  done
+}
 ln -sfn "$rel" /opt/muse/current.new && mv -T /opt/muse/current.new /opt/muse/current
-systemctl restart muse
-i=0
-until [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4535/)" = "200" ]; do
-  i=$((i+1))
-  if [ "$i" -ge 20 ]; then
-    echo "health check failed; rolling back" >&2
-    if [ -n "$prev" ]; then
-      ln -sfn "$prev" /opt/muse/current.new && mv -T /opt/muse/current.new /opt/muse/current
-      systemctl restart muse
-      rm -rf "$rel"
-    fi
-    exit 1
+if ! healthy; then
+  echo "release $sha did not come up; rolling back" >&2
+  if [ -n "$prev" ]; then
+    ln -sfn "$prev" /opt/muse/current.new && mv -T /opt/muse/current.new /opt/muse/current
+    systemctl restart muse || true
+    rm -rf "$rel"
   fi
-  sleep 1
-done
+  exit 1
+fi
 ls -1dt /opt/muse/releases/*/ | tail -n +4 | xargs -r rm -rf
 echo "release $sha live"
