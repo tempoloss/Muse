@@ -7,8 +7,13 @@ tar -x -C "$rel"
 export UV_PYTHON_INSTALL_DIR=/opt/muse/python UV_CACHE_DIR=/var/cache/uv UV_PROJECT_ENVIRONMENT="$rel/venv"
 uv sync --frozen --no-dev --package muse-server --project "$rel/src"
 chmod -R a+rX "$rel" /opt/muse/python
-runuser -u muse -- env MUSE_CONFIG=/etc/muse/muse.toml "$rel/venv/bin/muse" db upgrade
-prev=$(readlink -f /opt/muse/current 2>/dev/null || true)
+prev=$(readlink -e /opt/muse/current 2>/dev/null || true)
+muse() {
+  runuser -u muse -- env MUSE_CONFIG=/etc/muse/muse.toml "$rel/venv/bin/muse" "$@"
+}
+point() {
+  ln -sfn "$1" /opt/muse/current.new && mv -T /opt/muse/current.new /opt/muse/current
+}
 healthy() {
   systemctl restart muse || return 1
   i=0
@@ -17,16 +22,26 @@ healthy() {
     [ "$i" -lt 20 ] || return 1
     sleep 1
   done
+  muse check
 }
-ln -sfn "$rel" /opt/muse/current.new && mv -T /opt/muse/current.new /opt/muse/current
-if ! healthy; then
-  echo "release $sha did not come up; rolling back" >&2
-  if [ -n "$prev" ]; then
-    ln -sfn "$prev" /opt/muse/current.new && mv -T /opt/muse/current.new /opt/muse/current
-    systemctl restart muse || true
-    rm -rf "$rel"
-  fi
+systemctl stop muse
+if [ -n "$prev" ] && ! muse db snapshot; then
+  echo "could not snapshot the database; keeping the running release" >&2
+  rm -rf "$rel"
+  systemctl start muse
   exit 1
 fi
-ls -1dt /opt/muse/releases/*/ | tail -n +4 | xargs -r rm -rf
-echo "release $sha live"
+if muse db upgrade && point "$rel" && healthy; then
+  ls -1dt /opt/muse/releases/*/ | tail -n +4 | xargs -r rm -rf
+  echo "release $sha live"
+  exit 0
+fi
+echo "release $sha did not come up" >&2
+[ -n "$prev" ] || exit 1
+systemctl stop muse || true
+point "$prev"
+muse db restore || { echo "database restore failed; muse stays stopped" >&2; exit 1; }
+rm -rf "$rel"
+systemctl start muse
+echo "rolled back to $prev" >&2
+exit 1

@@ -52,8 +52,11 @@ library mount, systemd units and the firewall. Releases ship from a clean checko
     uv run python scripts/deploy.py
 
 The script streams the current commit and the built web client over SSH to
-`muse-install-release`, which installs the release, migrates the database and switches over
-only after a health check.
+`muse-install-release`. The installer stops the server, saves the user database to
+`muse.pre-upgrade.sqlite`, migrates it and starts the new release. The release stays only if the
+web client answers and `muse check` finds the user database intact at the expected revision, a
+non-empty catalog and a readable track file. Otherwise the saved database goes back and the
+previous release starts again.
 
 ## License
 
