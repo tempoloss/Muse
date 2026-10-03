@@ -1,6 +1,10 @@
+import json
 import logging
+import sqlite3
 import subprocess
 import tarfile
+import tempfile
+from contextlib import closing
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -8,6 +12,8 @@ from muse_agent.proc import NO_WINDOW, Remote, Runner, run_logged, ssh
 from muse_agent.settings import AgentConfig
 
 DATABASE_MEMBER = "muse.sqlite"
+USERS_MEMBER = "users.json"
+REVISION = "SELECT version_num FROM alembic_version"
 
 log = logging.getLogger(__name__)
 
@@ -29,7 +35,7 @@ def pull_backup(
     rclone = cfg.rclone
     try:
         download((remote or ssh(cfg.vps.agent_host))(f"backup {day.isoformat()}"), part)
-        verify(part)
+        revision = verify(part)
         code = run([rclone.exe, "copyto", str(part), remote_file(rclone.backups_remote, archive)])
         if code != 0:
             raise BackupError(f"backup: upload failed rc={code}")
@@ -42,7 +48,7 @@ def pull_backup(
     code = run([rclone.exe, "delete", rclone.backups_remote, "--min-age", f"{keep_days}d"])
     if code != 0:
         log.warning("backup: remote prune failed rc=%d", code)
-    log.info("backup: %s stored", archive.name)
+    log.info("backup: %s stored, schema %s", archive.name, revision)
     return archive
 
 
@@ -66,14 +72,38 @@ def download(argv: list[str], part: Path) -> None:
         raise BackupError(f"backup: the remote exited {done.returncode}: {reason}")
 
 
-def verify(archive: Path) -> None:
+def verify(archive: Path) -> str:
+    with tempfile.TemporaryDirectory(prefix="muse-restore-") as scratch:
+        restored = Path(scratch)
+        try:
+            with tarfile.open(archive, "r:gz") as tar:
+                tar.extractall(restored, filter="data")
+        except (tarfile.TarError, OSError, EOFError) as error:
+            raise BackupError(
+                f"backup: the stream is not a muse backup archive: {error}"
+            ) from error
+        for member in (DATABASE_MEMBER, USERS_MEMBER):
+            if not (restored / member).is_file():
+                raise BackupError(f"backup: the archive holds no {member}")
+        try:
+            json.loads((restored / USERS_MEMBER).read_text(encoding="utf-8"))
+        except ValueError as error:
+            raise BackupError(f"backup: {USERS_MEMBER} is not JSON: {error}") from error
+        return database_revision(restored / DATABASE_MEMBER)
+
+
+def database_revision(database: Path) -> str:
     try:
-        with tarfile.open(archive, "r:gz") as tar:
-            names = {member.name.removeprefix("./") for member in tar if member.isfile()}
-    except (tarfile.TarError, OSError, EOFError) as error:
-        raise BackupError(f"backup: the stream is not a muse backup archive: {error}") from error
-    if DATABASE_MEMBER not in names:
-        raise BackupError(f"backup: the archive holds no {DATABASE_MEMBER}")
+        with closing(sqlite3.connect(database)) as connection:
+            verdict = connection.execute("PRAGMA integrity_check").fetchone()[0]
+            if verdict != "ok":
+                raise BackupError(f"backup: {DATABASE_MEMBER} fails the integrity check: {verdict}")
+            found = connection.execute(REVISION).fetchone()
+    except sqlite3.DatabaseError as error:
+        raise BackupError(f"backup: {DATABASE_MEMBER} is unreadable: {error}") from error
+    if found is None:
+        raise BackupError(f"backup: {DATABASE_MEMBER} has no schema revision")
+    return found[0]
 
 
 def prune(folder: Path, cutoff: date) -> None:

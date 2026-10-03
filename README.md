@@ -58,6 +58,19 @@ web client answers and `muse check` finds the user database intact at the expect
 non-empty catalog and a readable track file. Otherwise the saved database goes back and the
 previous release starts again.
 
+## Backups
+
+`muse-backup.timer` packs the user database, `users.json`, `vapid.pem` and the notes into
+`/var/backups/muse` every night. The agent pulls each archive, restores it into a scratch
+directory and keeps it only if the database passes the integrity check and carries a schema
+revision. To bring a server back from an archive:
+
+    systemctl stop muse
+    rm -f /srv/muse/data/muse.sqlite-wal /srv/muse/data/muse.sqlite-shm
+    tar -xzf muse-YYYY-MM-DD.tar.gz -C /srv/muse/data
+    runuser -u muse -- /opt/muse/current/venv/bin/muse db upgrade
+    systemctl start muse
+
 ## License
 
 MIT

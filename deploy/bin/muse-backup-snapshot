@@ -5,6 +5,8 @@ out=/var/backups/muse/muse-$(date +%F).tar.gz
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 sqlite3 "$data/muse.sqlite" ".backup '$tmp/muse.sqlite'"
+check=$(sqlite3 "$tmp/muse.sqlite" 'PRAGMA integrity_check')
+[ "$check" = ok ] || { echo "muse.sqlite fails the integrity check: $check" >&2; exit 1; }
 cp -a "$data/users.json" "$data/vapid.pem" "$tmp/"
 if [ -d "$data/notes" ]; then cp -a "$data/notes" "$tmp/notes"; fi
 tar -C "$tmp" -czf "$out.part" .

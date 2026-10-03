@@ -1,5 +1,7 @@
+import sqlite3
 import sys
 import tarfile
+from contextlib import closing
 from datetime import date
 from pathlib import Path
 
@@ -12,6 +14,7 @@ from muse_agent.settings import AgentConfig
 from tests.agent.support import FakeRclone, agent_config
 
 DAY = date(2026, 10, 3)
+VALID = ("muse.sqlite", "users.json")
 
 STREAM = """
 import sys
@@ -42,14 +45,42 @@ def streaming(root: Path, payload: Path, code: int = 0) -> Remote:
     return argv
 
 
-def archive(root: Path, *members: str) -> Path:
+def user_database(path: Path, damage: str | None) -> None:
+    with closing(sqlite3.connect(path)) as db:
+        db.execute("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)")
+        if damage != "unversioned":
+            db.execute("INSERT INTO alembic_version VALUES ('0001')")
+        db.execute("CREATE TABLE likes (user TEXT, track_id INT)")
+        db.execute("CREATE INDEX likes_user ON likes(user)")
+        db.executemany("INSERT INTO likes VALUES (?, ?)", [(f"u{n}", n) for n in range(50)])
+        if damage == "corrupt index":
+            db.execute("PRAGMA writable_schema=ON")
+            db.execute(
+                "UPDATE sqlite_master SET sql='CREATE INDEX likes_user ON likes(track_id)' "
+                "WHERE name='likes_user'"
+            )
+        db.commit()
+
+
+def member(path: Path, damage: str | None) -> None:
+    if path.name == "users.json":
+        path.write_text("{" if damage == "users" else '{"users": []}', encoding="utf-8")
+    elif path.name == "muse.sqlite" and damage == "garbage":
+        path.write_bytes(b"not a database")
+    elif path.name == "muse.sqlite":
+        user_database(path, damage)
+    else:
+        path.write_bytes(b"data")
+
+
+def archive(root: Path, *members: str, damage: str | None = None) -> Path:
     folder = root / "snapshot"
     folder.mkdir()
     path = root / "payload.tar.gz"
     with tarfile.open(path, "w:gz") as tar:
-        for member in members:
-            (folder / member).write_bytes(b"data")
-            tar.add(folder / member, arcname=f"./{member}")
+        for name in members:
+            member(folder / name, damage)
+            tar.add(folder / name, arcname=f"./{name}")
     return path
 
 
@@ -60,7 +91,7 @@ def test_a_pulled_backup_is_uploaded_and_old_copies_are_pruned(
     backups.mkdir()
     for name in ("muse-2026-09-02.tar.gz", "muse-2026-09-03.tar.gz", "muse-notes.tar.gz"):
         (backups / name).write_bytes(b"old")
-    payload = archive(tmp_path, "muse.sqlite", "users.json")
+    payload = archive(tmp_path, *VALID, "vapid.pem")
     rclone = FakeRclone()
 
     stored = pull_backup(cfg, DAY, remote=streaming(tmp_path, payload), run=rclone)
@@ -79,14 +110,26 @@ def test_a_pulled_backup_is_uploaded_and_old_copies_are_pruned(
 
 
 @pytest.mark.parametrize(
-    ("members", "complaint"),
-    [((), "not a muse backup archive"), (("users.json",), "holds no muse.sqlite")],
+    ("members", "damage", "complaint"),
+    [
+        ((), None, "not a muse backup archive"),
+        (("users.json",), None, "holds no muse.sqlite"),
+        (("muse.sqlite",), None, "holds no users.json"),
+        (VALID, "users", "users.json is not JSON"),
+        (VALID, "garbage", "muse.sqlite is unreadable"),
+        (VALID, "corrupt index", "muse.sqlite fails the integrity check"),
+        (VALID, "unversioned", "muse.sqlite has no schema revision"),
+    ],
 )
-def test_a_stream_that_is_not_a_backup_leaves_no_file(
-    tmp_path: Path, cfg: AgentConfig, members: tuple[str, ...], complaint: str
+def test_a_backup_that_would_not_restore_leaves_no_file(
+    tmp_path: Path,
+    cfg: AgentConfig,
+    members: tuple[str, ...],
+    damage: str | None,
+    complaint: str,
 ) -> None:
     if members:
-        payload = archive(tmp_path, *members)
+        payload = archive(tmp_path, *members, damage=damage)
     else:
         payload = tmp_path / "junk"
         payload.write_bytes(b"this is not a tarball")
@@ -100,7 +143,7 @@ def test_a_stream_that_is_not_a_backup_leaves_no_file(
 
 
 def test_a_failing_remote_leaves_no_file(tmp_path: Path, cfg: AgentConfig) -> None:
-    payload = archive(tmp_path, "muse.sqlite")
+    payload = archive(tmp_path, *VALID)
     rclone = FakeRclone()
 
     with pytest.raises(BackupError, match="no backup yet"):
@@ -113,7 +156,7 @@ def test_a_failing_remote_leaves_no_file(tmp_path: Path, cfg: AgentConfig) -> No
 def test_a_failed_upload_leaves_the_day_open_for_the_next_tick(
     tmp_path: Path, cfg: AgentConfig
 ) -> None:
-    remote = streaming(tmp_path, archive(tmp_path, "muse.sqlite"))
+    remote = streaming(tmp_path, archive(tmp_path, *VALID))
     has_backup = agent_jobs(cfg).has_backup
 
     with pytest.raises(BackupError, match="upload failed rc=3"):
