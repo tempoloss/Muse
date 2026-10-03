@@ -3,6 +3,7 @@
 Muse is a small self-hosted music server for two listeners. It serves a read-only music library
 and its catalog database to a web client: listings, search, playlists, streaming with byte
 ranges, likes, listening stats, shared listening, letters, a shared pet and daily playlists.
+Song lyrics come from LRCLIB and are cached for two weeks.
 
 The repository holds two Python packages:
 

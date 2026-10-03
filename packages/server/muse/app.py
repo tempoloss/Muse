@@ -23,6 +23,7 @@ from muse.http.spa import api_not_found, spa
 from muse.identity.domain import Users
 from muse.identity.routes import router as identity
 from muse.insights.routes import router as insights
+from muse.lyrics.routes import router as lyrics
 from muse.notifications.routes import router as notifications
 from muse.pet.domain import HUNGER_CHECK_S
 from muse.pet.routes import router as pet
@@ -43,6 +44,7 @@ ROUTERS = (
     pet,
     together,
     insights,
+    lyrics,
     discovery,
     daily,
     home,

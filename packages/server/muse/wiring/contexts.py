@@ -40,6 +40,9 @@ from muse.identity.service import LoginService, SessionService
 from muse.insights.domain import PlayStats
 from muse.insights.infra.sql import SqlStats
 from muse.insights.service import ListeningStats
+from muse.lyrics.domain import LyricsSource
+from muse.lyrics.infra.lrclib import Lrclib
+from muse.lyrics.service import Lyrics
 from muse.notifications.domain import SubscriptionRepository
 from muse.notifications.infra.sql import SqlSubscriptions
 from muse.notifications.service import Notifier, PushReactions, PushSubscriptions
@@ -147,6 +150,12 @@ class ContextsProvider(Provider):
 
     play_stats = provide(SqlStats, provides=PlayStats)
     listening_stats = provide(ListeningStats)
+
+    @provide(scope=Scope.APP)
+    def lyrics_source(self, client: httpx.AsyncClient) -> LyricsSource:
+        return Lrclib(client)
+
+    lyrics = provide(Lyrics, scope=Scope.APP)
 
     radio_model_cache = provide(RadioModelCache, scope=Scope.APP)
     radio_models = provide(RadioModels, scope=Scope.APP)

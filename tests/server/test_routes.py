@@ -49,6 +49,7 @@ API = {
     ("PUT", "/api/ours/{int}"),
     ("DELETE", "/api/ours/{int}"),
     ("GET", "/api/notes"),
+    ("GET", "/api/lyrics/{int}"),
     ("GET", "/api/radio/{int}"),
     ("GET", "/api/mix/{str}"),
     ("GET", "/api/daily"),
