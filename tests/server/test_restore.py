@@ -1,4 +1,5 @@
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -25,9 +26,16 @@ def nightly_backup(data: Path, backups: Path) -> Path:
     backups.mkdir()
     script = SNAPSHOT.read_text(encoding="utf-8")
     script = script.replace("/srv/muse/data", str(data)).replace("/var/backups/muse", str(backups))
+    owner = data.stat()
+    script = script.replace("chown muse:muse", f"chown {owner.st_uid}:{owner.st_gid}")
     subprocess.run(["sh", "-c", script], check=True)
     [archive] = backups.glob("muse-*.tar.gz")
     return archive
+
+
+def restore(archive: Path, data: Path) -> None:
+    command = ["tar", "-xzf", str(archive), "-C", str(data), "--no-overwrite-dir"]
+    subprocess.run(command, check=True)
 
 
 async def test_a_nightly_backup_brings_a_fresh_server_back_with_the_same_likes(
@@ -38,8 +46,13 @@ async def test_a_nightly_backup_brings_a_fresh_server_back_with_the_same_likes(
     archive = nightly_backup(settings.paths.data_dir, tmp_path / "backups")
 
     restored = tmp_path / "restored"
+    restored.mkdir()
+    restored.chmod(0o750)
+    restore(archive, restored)
     with tarfile.open(archive, "r:gz") as tar:
-        tar.extractall(restored, filter="data")
+        assert sorted(tar.getnames()) == ["muse.sqlite", "users.json", "vapid.pem"]
+    assert stat.S_IMODE(restored.stat().st_mode) == 0o750
+    assert stat.S_IMODE((restored / "muse.sqlite").stat().st_mode) == 0o600
     upgrade_database(restored / "muse.sqlite")
     paths = settings.paths.model_copy(update={"data_dir": restored})
     app = create_app(settings.model_copy(update={"paths": paths}))

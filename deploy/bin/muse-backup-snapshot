@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+umask 077
 data=/srv/muse/data
 out=/var/backups/muse/muse-$(date +%F).tar.gz
 tmp=$(mktemp -d)
@@ -7,8 +8,10 @@ trap 'rm -rf "$tmp"' EXIT
 sqlite3 "$data/muse.sqlite" ".backup '$tmp/muse.sqlite'"
 check=$(sqlite3 "$tmp/muse.sqlite" 'PRAGMA integrity_check')
 [ "$check" = ok ] || { echo "muse.sqlite fails the integrity check: $check" >&2; exit 1; }
+chown muse:muse "$tmp/muse.sqlite"
 cp -a "$data/users.json" "$data/vapid.pem" "$tmp/"
-if [ -d "$data/notes" ]; then cp -a "$data/notes" "$tmp/notes"; fi
-tar -C "$tmp" -czf "$out.part" .
+members="muse.sqlite users.json vapid.pem"
+if [ -d "$data/notes" ]; then cp -a "$data/notes" "$tmp/notes"; members="$members notes"; fi
+tar -C "$tmp" -czf "$out.part" $members
 mv -f "$out.part" "$out"
 find /var/backups/muse -name 'muse-*.tar.gz' -mtime +14 -delete

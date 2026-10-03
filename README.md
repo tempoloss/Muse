@@ -67,7 +67,9 @@ revision. To bring a server back from an archive:
 
     systemctl stop muse
     rm -f /srv/muse/data/muse.sqlite-wal /srv/muse/data/muse.sqlite-shm
-    tar -xzf muse-YYYY-MM-DD.tar.gz -C /srv/muse/data
+    tar -xzf muse-YYYY-MM-DD.tar.gz -C /srv/muse/data --no-overwrite-dir
+    chown -R muse:muse /srv/muse/data
+    chmod 600 /srv/muse/data/muse.sqlite
     runuser -u muse -- /opt/muse/current/venv/bin/muse db upgrade
     systemctl start muse
 
