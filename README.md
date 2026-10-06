@@ -7,8 +7,10 @@ Song lyrics come from LRCLIB and are cached for two weeks.
 
 A queue can also play as one continuous MP3 stream (`/api/run`), the way the iPhone home-screen
 app plays: there the next song of a queue often never loads in the background, so songs change
-inside the stream instead. Each song fills exactly its catalog length; songs that are not
-MPEG-1 48 kHz stereo are re-encoded with ffmpeg, which `deploy/provision.sh` installs.
+inside the stream instead. Each song fills exactly its catalog length and is read from disk in
+chunks; songs that are not MPEG-1 48 kHz stereo are re-encoded with ffmpeg, which
+`deploy/provision.sh` installs. A stream ends early, before the first song it cannot play (no
+catalog length, file gone, failed re-encoding), and the client starts a new one from there.
 
 The repository holds two Python packages:
 

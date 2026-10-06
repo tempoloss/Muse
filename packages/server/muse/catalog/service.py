@@ -1,9 +1,9 @@
 import math
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence
-from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
 import anyio
+import structlog
 
 from muse.catalog.domain import (
     BAD_RUN,
@@ -15,8 +15,12 @@ from muse.catalog.domain import (
     NO_SUCH_ARTIST,
     NO_SUCH_GENRE,
     NO_TRACK,
-    RUN_CHUNK,
+    NOT_PLAYABLE,
+    PAD_WARN_S,
+    REENCODE_WAIT_S,
     RUN_IDS,
+    RUN_IO_S,
+    RUN_READ,
     RUN_SONGS,
     SEARCH_MIN_CHARS,
     AlbumCard,
@@ -46,9 +50,21 @@ from muse.catalog.domain import (
 )
 from muse.shared.cache import Cache
 from muse.shared.errors import DomainError
-from muse.shared.mp3 import STREAM_KIND, Joiner
+from muse.shared.mp3 import STREAM_KIND, FrameReader, Joiner
 
-PREPARE = ThreadPoolExecutor(max_workers=2, thread_name_prefix="run")
+log = structlog.get_logger()
+
+
+class RunCutError(Exception):
+    def __init__(self, why: str) -> None:
+        super().__init__(why)
+        self.why = why
+
+
+async def bounded[*A, T](fn: Callable[[*A], T], *args: *A, limit: float = RUN_IO_S) -> T | None:
+    with anyio.move_on_after(limit):
+        return await anyio.to_thread.run_sync(fn, *args, abandon_on_cancel=True)
+    return None
 
 
 class Catalog:
@@ -91,32 +107,79 @@ class Catalog:
         for track_id in wanted:
             row = by_id.get(track_id)
             if row is None or not row["dur"]:
-                raise DomainError(NO_TRACK)
+                break
             rows.append(row)
+        if not rows:
+            raise DomainError(NO_TRACK)
         if at >= (rows[0]["dur"] or 0):
             raise DomainError(BAD_RUN)
         if await self.track_file(rows[0]["path"]) is None:
             raise DomainError(FILE_GONE)
+        if len(rows) < len(wanted):
+            log.warning("run shortened", track=wanted[len(rows)], why=NOT_PLAYABLE)
         return self._run_audio(rows, at)
-
-    def _prepare(self, row: RunRow) -> Future[bytes | None]:
-        return PREPARE.submit(self.storage.stream_bytes, row["path"])
 
     async def _run_audio(self, rows: list[RunRow], at: float) -> AsyncIterator[bytes]:
         joiner = Joiner(STREAM_KIND)
-        upcoming = self._prepare(rows[0])
         for index, row in enumerate(rows):
-            data = await anyio.to_thread.run_sync(upcoming.result)
-            if index + 1 < len(rows):
-                upcoming = self._prepare(rows[index + 1])
-            if data is None:
+            joiner.song(float(row["dur"] or 0), at if index == 0 else 0.0)
+            try:
+                async for body in self._song(row, joiner):
+                    yield body
+            except RunCutError as cut:
+                log.warning("run cut", track=row["id"], why=cut.why)
                 return
-            start = at if index == 0 else 0.0
-            body = await anyio.to_thread.run_sync(joiner.add, data, float(row["dur"] or 0), start)
-            if body is None:
-                return
-            for offset in range(0, len(body), RUN_CHUNK):
-                yield body[offset : offset + RUN_CHUNK]
+
+    async def _song(self, row: RunRow, joiner: Joiner) -> AsyncIterator[bytes]:
+        if not joiner.left:
+            return
+        reader = FrameReader()
+        async for body in self._native(row, joiner, reader):
+            yield body
+        if reader.kind != STREAM_KIND:
+            encoded = await self._reencoded(row, joiner)
+            if encoded:
+                yield encoded
+        missing = joiner.left * STREAM_KIND.samples / STREAM_KIND.rate
+        if missing > PAD_WARN_S:
+            log.warning("run padded", track=row["id"], seconds=round(missing, 1))
+        if padding := joiner.finish():
+            yield padding
+
+    async def _native(
+        self, row: RunRow, joiner: Joiner, reader: FrameReader
+    ) -> AsyncIterator[bytes]:
+        source = await bounded(self.storage.open_audio, row["path"])
+        if source is None:
+            raise RunCutError(FILE_GONE)
+        try:
+            while joiner.left:
+                try:
+                    chunk = await bounded(source.read, RUN_READ)
+                except OSError:
+                    raise RunCutError("read failed") from None
+                if chunk is None:
+                    raise RunCutError("read timeout")
+                frames = reader.push(chunk)
+                if reader.kind is not None and reader.kind != STREAM_KIND:
+                    return
+                if body := joiner.take(frames):
+                    yield body
+                if not chunk or reader.done:
+                    return
+        finally:
+            with anyio.CancelScope(shield=True):
+                await bounded(source.close)
+
+    async def _reencoded(self, row: RunRow, joiner: Joiner) -> bytes:
+        data = await bounded(self.storage.reencoded, row["path"], limit=REENCODE_WAIT_S)
+        if data is None:
+            raise RunCutError(NOT_PLAYABLE)
+        reader = FrameReader()
+        frames = reader.push(data)
+        if reader.kind != STREAM_KIND:
+            raise RunCutError(NOT_PLAYABLE)
+        return joiner.take(frames)
 
     async def fingerprint(self) -> str:
         return await anyio.to_thread.run_sync(self.library.fingerprint)

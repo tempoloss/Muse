@@ -2,9 +2,10 @@ import shutil
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
+from typing import BinaryIO
 
 from muse.catalog.domain import LibraryRoot
-from muse.shared.mp3 import STREAM_KIND, audio_of
+from muse.shared.mp3 import STREAM_KIND
 
 REENCODE_TIMEOUT_S = 180
 REENCODE = (
@@ -62,15 +63,15 @@ class TrackFiles:
             return None
         return candidate if candidate.is_file() else None
 
-    def stream_bytes(self, stored: str | None) -> bytes | None:
+    def open_audio(self, stored: str | None) -> BinaryIO | None:
         path = self.locate(stored)
         if path is None:
             return None
         try:
-            data = path.read_bytes()
+            return path.open("rb")
         except OSError:
             return None
-        audio = audio_of(data)
-        if audio is not None and audio.kind == STREAM_KIND:
-            return data
-        return self.encoder(path)
+
+    def reencoded(self, stored: str | None) -> bytes | None:
+        path = self.locate(stored)
+        return None if path is None else self.encoder(path)

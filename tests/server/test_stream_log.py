@@ -99,7 +99,10 @@ async def test_a_response_left_unfinished_is_cut_and_a_failure_is_aborted() -> N
         with pytest.raises(OSError, match="remote read failed"):
             await run(cast("ASGIApp", broken))
 
-    assert [(entry["status"], entry["bytes"], entry["end"]) for entry in streamed(logs)] == [
+    entries = streamed(logs)
+    assert [(entry["status"], entry["bytes"], entry["end"]) for entry in entries] == [
         (206, 3, "cut"),
         (200, 0, "aborted"),
     ]
+    assert isinstance(entries[0]["body_ms"], int)
+    assert entries[1]["body_ms"] is None

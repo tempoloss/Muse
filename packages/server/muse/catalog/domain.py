@@ -2,7 +2,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Protocol, TypedDict
+from typing import BinaryIO, Protocol, TypedDict
 
 SINGLES = "Одиночные и синглы"
 ARTIST = "COALESCE(ar.canonical, t.artist)"
@@ -26,8 +26,12 @@ NO_SUCH_GENRE = "no such genre"
 NO_PLAYLIST = "no playlist"
 FILE_GONE = "file gone"
 BAD_RUN = "bad run"
+NOT_PLAYABLE = "not playable"
 RUN_SONGS = 100
-RUN_CHUNK = 64 * 1024
+RUN_READ = 256 * 1024
+RUN_IO_S = 30.0
+REENCODE_WAIT_S = 200.0
+PAD_WARN_S = 3.0
 RUN_IDS = re.compile(r"\d{1,9}(?:,\d{1,9})*")
 DEVICE_PREFIX = re.compile(r"^.*?/Music/")
 DRIVE = re.compile(r"^[A-Za-z]:/")
@@ -285,4 +289,6 @@ class PlaylistSource(Protocol):
 class TrackStorage(Protocol):
     def locate(self, stored: str | None) -> Path | None: ...
 
-    def stream_bytes(self, stored: str | None) -> bytes | None: ...
+    def open_audio(self, stored: str | None) -> BinaryIO | None: ...
+
+    def reencoded(self, stored: str | None) -> bytes | None: ...

@@ -6,7 +6,7 @@ limit=120
 rel=$(mktemp -d "/opt/muse/releases/$sha.XXXXXX")
 tar -x -C "$rel"
 export UV_PYTHON_INSTALL_DIR=/opt/muse/python UV_CACHE_DIR=/var/cache/uv UV_PROJECT_ENVIRONMENT="$rel/venv"
-uv sync --frozen --no-dev --package muse-server --project "$rel/src"
+uv sync --frozen --no-dev --compile-bytecode --package muse-server --project "$rel/src"
 chmod -R a+rX "$rel" /opt/muse/python
 prev=$(readlink -e /opt/muse/current 2>/dev/null || true)
 muse() {

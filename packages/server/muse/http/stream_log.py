@@ -19,6 +19,7 @@ log = structlog.get_logger()
 class Delivery:
     status: int | None = None
     first: float | None = None
+    body: float | None = None
     sent: int = 0
     complete: bool = False
 
@@ -52,6 +53,8 @@ class StreamLog:
                 delivery.first = self.clock() - started
             elif message["type"] == "http.response.body":
                 delivery.sent += len(message["body"])
+                if message["body"] and delivery.body is None:
+                    delivery.body = self.clock() - started
                 delivery.complete = not message.get("more_body", False)
             await send(message)
 
@@ -72,6 +75,7 @@ class StreamLog:
                 status=delivery.status,
                 bytes=delivery.sent,
                 first_ms=None if delivery.first is None else round(delivery.first * MS),
+                body_ms=None if delivery.body is None else round(delivery.body * MS),
                 ms=round((self.clock() - started) * MS),
                 end="done" if delivery.complete else "cut" if returned else "aborted",
             )

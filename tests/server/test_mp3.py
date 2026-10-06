@@ -1,6 +1,14 @@
 import pytest
 
-from muse.shared.mp3 import STREAM_KIND, Joiner, Kind, audio_of, frame_at, silent_frame
+from muse.shared.mp3 import (
+    STREAM_KIND,
+    SYNC_LIMIT,
+    FrameReader,
+    Joiner,
+    Kind,
+    frame_at,
+    silent_frame,
+)
 
 STEREO_48 = bytes.fromhex("fffb9404")
 STEREO_48_SIZE = 384
@@ -52,13 +60,32 @@ def test_audio_starts_after_the_tags_and_the_info_frame_and_ends_before_trailing
     picture = b"cover art that happens to hold " + header + bytes(200)
     tail = b"TAG" + bytes(125)
     data = id3(picture) + info(header, size, side) + song(header, size, 3) + tail
+    whole, pieces = FrameReader(), FrameReader()
 
-    audio = audio_of(data)
+    at_once = whole.push(data)
+    piecewise = [piece for at in range(0, len(data), 7) for piece in pieces.push(data[at : at + 7])]
 
-    assert audio is not None
-    assert audio.kind == kind
-    assert [data[at + 4] for at in audio.frames[:-1]] == [1, 2, 3]
-    assert audio.frames[-1] == len(data) - len(tail)
+    assert piecewise == at_once
+    assert [piece[4] for piece in at_once] == [1, 2, 3]
+    assert (whole.kind, whole.done, pieces.kind, pieces.done) == (kind, True, kind, True)
+
+
+def test_a_frame_of_another_kind_ends_the_audio() -> None:
+    reader = FrameReader()
+
+    frames = reader.push(song(STEREO_48, STEREO_48_SIZE, 2) + song(MONO_44, MONO_44_SIZE, 3))
+
+    assert [piece[4] for piece in frames] == [1, 2]
+    assert reader.done
+
+
+def test_a_file_without_audio_near_its_start_is_given_up_on() -> None:
+    reader = FrameReader()
+
+    assert reader.push(bytes(SYNC_LIMIT)) == []
+    assert not reader.done
+    assert reader.push(bytes(1)) == []
+    assert (reader.kind, reader.done) == (None, True)
 
 
 @pytest.mark.parametrize(
@@ -79,42 +106,33 @@ def test_silence_parses_back_as_a_frame_of_its_own_kind(kind: Kind) -> None:
 
 def test_songs_are_laid_on_a_grid_of_their_catalog_lengths() -> None:
     joiner = Joiner(STREAM_KIND)
-    short = song(STEREO_48, STEREO_48_SIZE, 30, first_mark=1)
-    long = song(STEREO_48, STEREO_48_SIZE, 60, first_mark=100)
-
-    first = joiner.add(short, 1.0)
-    second = joiner.add(long, 1.0)
-
-    assert first is not None
-    assert second is not None
-    frames = split(first + second)
+    short = split(song(STEREO_48, STEREO_48_SIZE, 30, first_mark=1))
+    long = split(song(STEREO_48, STEREO_48_SIZE, 60, first_mark=100))
     first_slot = round(1.0 * PER_SECOND)
-    assert len(frames) == round(2.0 * PER_SECOND)
+    second_slot = round(2.0 * PER_SECOND) - first_slot
+
+    joiner.song(1.0)
+    first = joiner.take(short) + joiner.finish()
+    joiner.song(1.0)
+    second = joiner.take(long[:second_slot])
+    left = joiner.left
+    surplus = joiner.take(long[second_slot:]) + joiner.finish()
+
+    frames = split(first + second)
+    assert (left, surplus) == (0, b"")
     assert [piece[4] for piece in frames[:30]] == list(range(1, 31))
     assert frames[30:first_slot] == [silent_frame(STREAM_KIND)] * (first_slot - 30)
-    assert [piece[4] for piece in frames[first_slot:]] == list(
-        range(100, 100 + len(frames) - first_slot)
-    )
+    assert [piece[4] for piece in frames[first_slot:]] == list(range(100, 100 + second_slot))
 
 
 def test_a_start_second_skips_into_the_first_song() -> None:
     joiner = Joiner(STREAM_KIND)
+    frames = split(song(STEREO_48, STEREO_48_SIZE, 60))
 
-    body = joiner.add(song(STEREO_48, STEREO_48_SIZE, 60), 1.2, start=0.24)
+    joiner.song(1.2, start=0.24)
+    body = joiner.take(frames[:5]) + joiner.take(frames[5:])
 
-    assert body is not None
     skipped = round(0.24 * PER_SECOND)
     assert [piece[4] for piece in split(body)] == list(
         range(1 + skipped, 1 + skipped + round((1.2 - 0.24) * PER_SECOND))
     )
-
-
-def test_a_song_of_another_kind_or_without_audio_is_refused_and_leaves_the_grid_alone() -> None:
-    joiner = Joiner(STREAM_KIND)
-
-    refused = [joiner.add(song(MONO_44, MONO_44_SIZE, 10), 1.0), joiner.add(b"not audio", 1.0)]
-    body = joiner.add(song(STEREO_48, STEREO_48_SIZE, 50), 1.0)
-
-    assert refused == [None, None]
-    assert body is not None
-    assert len(split(body)) == round(1.0 * PER_SECOND)
