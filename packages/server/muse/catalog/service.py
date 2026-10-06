@@ -1,9 +1,12 @@
-from collections.abc import Awaitable, Callable, Iterable, Sequence
+import math
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
 import anyio
 
 from muse.catalog.domain import (
+    BAD_RUN,
     CATALOG_TTL_S,
     COVER_MOSAIC,
     FILE_GONE,
@@ -12,6 +15,9 @@ from muse.catalog.domain import (
     NO_SUCH_ARTIST,
     NO_SUCH_GENRE,
     NO_TRACK,
+    RUN_CHUNK,
+    RUN_IDS,
+    RUN_SONGS,
     SEARCH_MIN_CHARS,
     AlbumCard,
     AlbumHead,
@@ -27,6 +33,7 @@ from muse.catalog.domain import (
     PlaylistCard,
     PlaylistPage,
     PlaylistSource,
+    RunRow,
     SearchResult,
     StoredTrack,
     Track,
@@ -39,6 +46,9 @@ from muse.catalog.domain import (
 )
 from muse.shared.cache import Cache
 from muse.shared.errors import DomainError
+from muse.shared.mp3 import STREAM_KIND, Joiner
+
+PREPARE = ThreadPoolExecutor(max_workers=2, thread_name_prefix="run")
 
 
 class Catalog:
@@ -69,6 +79,44 @@ class Catalog:
 
     async def track_file(self, stored: str | None) -> Path | None:
         return await anyio.to_thread.run_sync(self.storage.locate, stored)
+
+    async def run(self, ids: str, at: float) -> AsyncIterator[bytes]:
+        if not RUN_IDS.fullmatch(ids) or not math.isfinite(at) or at < 0:
+            raise DomainError(BAD_RUN)
+        wanted = [int(item) for item in ids.split(",")]
+        if len(wanted) > RUN_SONGS:
+            raise DomainError(BAD_RUN)
+        by_id = {row["id"]: row for row in await self.queries.run_rows(wanted)}
+        rows: list[RunRow] = []
+        for track_id in wanted:
+            row = by_id.get(track_id)
+            if row is None or not row["dur"]:
+                raise DomainError(NO_TRACK)
+            rows.append(row)
+        if at >= (rows[0]["dur"] or 0):
+            raise DomainError(BAD_RUN)
+        if await self.track_file(rows[0]["path"]) is None:
+            raise DomainError(FILE_GONE)
+        return self._run_audio(rows, at)
+
+    def _prepare(self, row: RunRow) -> Future[bytes | None]:
+        return PREPARE.submit(self.storage.stream_bytes, row["path"])
+
+    async def _run_audio(self, rows: list[RunRow], at: float) -> AsyncIterator[bytes]:
+        joiner = Joiner(STREAM_KIND)
+        upcoming = self._prepare(rows[0])
+        for index, row in enumerate(rows):
+            data = await anyio.to_thread.run_sync(upcoming.result)
+            if index + 1 < len(rows):
+                upcoming = self._prepare(rows[index + 1])
+            if data is None:
+                return
+            start = at if index == 0 else 0.0
+            body = await anyio.to_thread.run_sync(joiner.add, data, float(row["dur"] or 0), start)
+            if body is None:
+                return
+            for offset in range(0, len(body), RUN_CHUNK):
+                yield body[offset : offset + RUN_CHUNK]
 
     async def fingerprint(self) -> str:
         return await anyio.to_thread.run_sync(self.library.fingerprint)

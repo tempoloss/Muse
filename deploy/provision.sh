@@ -13,7 +13,7 @@ cloudflare_list=/etc/apt/sources.list.d/cloudflared.list
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y sqlite3 redis-server ufw curl ca-certificates fuse3
+apt-get install -y sqlite3 redis-server ufw curl ca-certificates fuse3 ffmpeg
 
 if ! command -v rclone >/dev/null 2>&1; then
   apt-get install -y unzip

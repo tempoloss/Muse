@@ -3,8 +3,8 @@ import io
 from mutagen.id3 import APIC, ID3, Encoding, PictureType
 from PIL import Image
 
-FRAME_HEADER = bytes.fromhex("fffb90c4")
-FRAME_LENGTH = 417
+FRAME_HEADER = bytes.fromhex("fffb9404")
+FRAME_LENGTH = 384
 COVER_SIDE = 600
 COVER_COLOR = (184, 92, 56)
 

@@ -14,6 +14,7 @@ from muse.catalog.domain import (
     ArtistCount,
     GenreCount,
     LibraryTrack,
+    RunRow,
     SearchResult,
     StoredTrack,
     Track,
@@ -134,3 +135,8 @@ class SqlCatalog:
     async def track_path(self, track_id: int) -> TrackPath | None:
         sql = "SELECT path FROM tracks WHERE id=? AND status='ok'"
         return cast("TrackPath | None", await self.db.row(sql, (track_id,)))
+
+    async def run_rows(self, ids: Sequence[int]) -> list[RunRow]:
+        marks = ",".join("?" * len(ids))
+        sql = f"SELECT id, path, dur FROM tracks WHERE status='ok' AND id IN ({marks})"
+        return cast("list[RunRow]", await self.db.rows(sql, ids))

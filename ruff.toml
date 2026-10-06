@@ -54,7 +54,7 @@ known-first-party = ["muse", "muse_agent", "tests", "scripts"]
 "packages/server/muse/settings.py" = ["TID251"]
 "packages/agent/muse_agent/settings.py" = ["TID251"]
 "packages/agent/**" = ["S603", "S607"]
-"packages/server/muse/*/infra/*.py" = ["S608"]
+"packages/server/muse/*/infra/*.py" = ["S603", "S608"]
 
 [format]
 quote-style = "double"

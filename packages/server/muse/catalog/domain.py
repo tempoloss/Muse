@@ -25,6 +25,10 @@ NO_TRACK = "no track"
 NO_SUCH_GENRE = "no such genre"
 NO_PLAYLIST = "no playlist"
 FILE_GONE = "file gone"
+BAD_RUN = "bad run"
+RUN_SONGS = 100
+RUN_CHUNK = 64 * 1024
+RUN_IDS = re.compile(r"\d{1,9}(?:,\d{1,9})*")
 DEVICE_PREFIX = re.compile(r"^.*?/Music/")
 DRIVE = re.compile(r"^[A-Za-z]:/")
 
@@ -114,6 +118,12 @@ class StoredTrack(Track):
 
 class TrackPath(TypedDict):
     path: str | None
+
+
+class RunRow(TypedDict):
+    id: int
+    path: str | None
+    dur: int | None
 
 
 class TrackDuration(TypedDict):
@@ -257,6 +267,8 @@ class CatalogQueries(Protocol):
 
     async def track_path(self, track_id: int) -> TrackPath | None: ...
 
+    async def run_rows(self, ids: Sequence[int]) -> list[RunRow]: ...
+
 
 class LibraryState(Protocol):
     def fingerprint(self) -> str: ...
@@ -272,3 +284,5 @@ class PlaylistSource(Protocol):
 
 class TrackStorage(Protocol):
     def locate(self, stored: str | None) -> Path | None: ...
+
+    def stream_bytes(self, stored: str | None) -> bytes | None: ...

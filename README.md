@@ -5,6 +5,11 @@ and its catalog database to a web client: listings, search, playlists, streaming
 ranges, likes, listening stats, shared listening, letters, a shared pet and daily playlists.
 Song lyrics come from LRCLIB and are cached for two weeks.
 
+A queue can also play as one continuous MP3 stream (`/api/run`), the way the iPhone home-screen
+app plays: there the next song of a queue often never loads in the background, so songs change
+inside the stream instead. Each song fills exactly its catalog length; songs that are not
+MPEG-1 48 kHz stereo are re-encoded with ffmpeg, which `deploy/provision.sh` installs.
+
 The repository holds two Python packages:
 
 - `packages/server` (`muse`): the Litestar server.

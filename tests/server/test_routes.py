@@ -20,6 +20,7 @@ API = {
     ("GET", "/api/search"),
     ("GET", "/api/track/{int}"),
     ("GET", "/api/stream/{int}"),
+    ("GET", "/api/run"),
     ("GET", "/api/genre/{str}"),
     ("GET", "/api/artist-image"),
     ("GET", "/api/cover/{int}"),

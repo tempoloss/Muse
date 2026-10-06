@@ -69,6 +69,22 @@ async def test_a_refused_audio_request_is_logged_without_a_user(
     assert (entry["status"], entry["user"], entry["end"]) == (401, None, "done")
 
 
+async def test_a_run_is_logged_as_one_request_with_its_songs(
+    alice: httpx.AsyncClient, track_id: int, other_track_id: int
+) -> None:
+    with capture_logs() as logs:
+        response = await alice.get(f"/api/run?ids={track_id},{other_track_id}")
+
+    [entry] = streamed(logs)
+    assert (entry["track"], entry["query"], entry["status"], entry["bytes"], entry["end"]) == (
+        "run",
+        f"ids={track_id},{other_track_id}",
+        200,
+        len(response.content),
+        "done",
+    )
+
+
 async def test_a_response_left_unfinished_is_cut_and_a_failure_is_aborted() -> None:
     async def left(_: Any, __: Any, send: Any) -> None:
         await send({"type": "http.response.start", "status": 206, "headers": []})

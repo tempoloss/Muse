@@ -9,6 +9,7 @@ from muse.diagnostics.domain import device
 from muse.identity.domain import User
 
 STREAM_PATH = "/api/stream/"
+RUN_PATH = "/api/run"
 MS = 1000
 
 log = structlog.get_logger()
@@ -26,13 +27,20 @@ def header(scope: Scope, name: bytes) -> str | None:
     return next((value.decode("latin-1") for key, value in scope["headers"] if key == name), None)
 
 
+def audio_track(path: str) -> str | None:
+    if path.startswith(STREAM_PATH):
+        return path.removeprefix(STREAM_PATH)
+    return "run" if path == RUN_PATH else None
+
+
 class StreamLog:
     def __init__(self, app: ASGIApp, clock: Callable[[], float] = time.monotonic) -> None:
         self.app = app
         self.clock = clock
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not scope["path"].startswith(STREAM_PATH):
+        track = audio_track(scope["path"]) if scope["type"] == "http" else None
+        if track is None:
             await self.app(scope, receive, send)
             return
         started = self.clock()
@@ -55,7 +63,7 @@ class StreamLog:
             user = scope.get("user")
             log.info(
                 "stream request",
-                track=scope["path"].removeprefix(STREAM_PATH),
+                track=track,
                 user=user.id if isinstance(user, User) else None,
                 device=device(header(scope, b"user-agent") or ""),
                 range=header(scope, b"range"),

@@ -4,6 +4,7 @@ from litestar.params import FromPath, FromQuery
 from litestar.response import Stream
 
 from muse.catalog.domain import (
+    BAD_RUN,
     FILE_GONE,
     NO_ALBUM,
     NO_PLAYLIST,
@@ -32,6 +33,7 @@ ERRORS = {
     NO_SUCH_GENRE: 404,
     NO_PLAYLIST: 404,
     FILE_GONE: 404,
+    BAD_RUN: 400,
 }
 MP3 = "audio/mpeg"
 
@@ -104,6 +106,14 @@ async def stream(
     return await file_response(await catalog.stream_file(tid), MP3, request)
 
 
+@get("/run")
+@inject
+async def run(
+    catalog: FromDishka[Catalog], ids: FromQuery[str] = "", at: FromQuery[float] = 0.0
+) -> Stream:
+    return Stream(await catalog.run(ids, at), media_type=MP3)
+
+
 router = Router(
     "/api",
     route_handlers=[
@@ -115,6 +125,7 @@ router = Router(
         search,
         track,
         stream,
+        run,
         genre,
         playlists,
         playlist,
