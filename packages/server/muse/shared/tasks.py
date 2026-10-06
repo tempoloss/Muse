@@ -1,3 +1,4 @@
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
@@ -5,7 +6,22 @@ import anyio
 import structlog
 from anyio.abc import TaskGroup
 
+LOOP_CHECK_S = 0.5
+LOOP_LATE_S = 0.25
+
 log = structlog.get_logger()
+
+
+async def watch_loop(
+    clock: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], Awaitable[None]] = anyio.sleep,
+) -> None:
+    while True:
+        before = clock()
+        await sleep(LOOP_CHECK_S)
+        late = clock() - before - LOOP_CHECK_S
+        if late >= LOOP_LATE_S:
+            log.warning("event loop was blocked", ms=round(late * 1000))
 
 
 class BackgroundRunner:

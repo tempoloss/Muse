@@ -2,7 +2,11 @@ import anyio
 import pytest
 from structlog.testing import capture_logs
 
-from muse.shared.tasks import BackgroundRunner
+from muse.shared.tasks import BackgroundRunner, watch_loop
+
+
+class StopError(Exception):
+    pass
 
 
 async def test_spawned_work_runs_while_the_caller_continues_and_failures_are_logged() -> None:
@@ -59,3 +63,19 @@ async def test_spawning_needs_a_running_runner() -> None:
 
     with pytest.raises(RuntimeError, match="not running"):
         runner.spawn(noop, name="outside")
+
+
+async def test_only_a_wakeup_that_came_late_is_reported_as_a_blocked_loop() -> None:
+    readings = iter([0.0, 0.5, 1.0, 1.52, 2.0, 3.9, 4.0])
+    naps: list[float] = []
+
+    async def nap(seconds: float) -> None:
+        naps.append(seconds)
+        if len(naps) == 4:
+            raise StopError
+
+    with capture_logs() as logs, pytest.raises(StopError):
+        await watch_loop(lambda: next(readings), nap)
+
+    assert naps == [0.5] * 4
+    assert [(entry["event"], entry["ms"]) for entry in logs] == [("event loop was blocked", 1400)]

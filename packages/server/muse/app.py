@@ -20,6 +20,7 @@ from muse.http.auth import SessionAuthMiddleware
 from muse.http.errors import EXCEPTION_HANDLERS
 from muse.http.policy import HttpPolicy
 from muse.http.spa import api_not_found, spa
+from muse.http.stream_log import StreamLog
 from muse.identity.domain import Users
 from muse.identity.routes import router as identity
 from muse.insights.routes import router as insights
@@ -29,7 +30,7 @@ from muse.pet.domain import HUNGER_CHECK_S
 from muse.pet.routes import router as pet
 from muse.pet.service import HungerWatch
 from muse.settings import Settings
-from muse.shared.tasks import BackgroundRunner
+from muse.shared.tasks import BackgroundRunner, watch_loop
 from muse.together.routes import router as together
 from muse.wiring.contexts import ContextsProvider
 from muse.wiring.core import CoreProvider
@@ -75,6 +76,7 @@ def lifespan(
             if jobs:
                 runner.spawn((await container.get(Artwork)).warm, name="artwork")
                 runner.spawn(watch_hunger, container, name="pet")
+                runner.spawn(watch_loop, name="loop")
             yield
 
     return run
@@ -98,7 +100,9 @@ def create_app(
         logging_config=None,
     )
     app.asgi_handler = HttpPolicy(
-        app.asgi_handler, origins=settings.http.origins, public_host=settings.http.public_host
+        StreamLog(app.asgi_handler),
+        origins=settings.http.origins,
+        public_host=settings.http.public_host,
     )
     setup_dishka(container, app)
     return app
